@@ -44,7 +44,9 @@ async def on_message(message):
         test = await client.send_message(message.channel, "Da, functionez!")
         
     elif message.content.startswith('.debug'):
-        await GetInfo()
+        test1 = RandomIntGen(0 ,2)
+        test2 = await client.send_message(message.server, "Vlaoare: " + str(test1))
+        print(str(test1))
         
 
     elif message.content.startswith('.amuzant'):
@@ -65,7 +67,7 @@ async def on_message(message):
         
         
     elif message.content.startswith('.gluma'):
-        RandomIntGen(0, 9)
+        randomJoke = RandomIntGen(0, 9)
         ResetJokes()
         global Said1
         global Said2
@@ -79,15 +81,15 @@ async def on_message(message):
 
         # If the same random number was generated, generate another in order for the bot to respond
 
-        while outputRand == 1 and Said1 == True or outputRand == 2 and Said2 == True or outputRand == 3 and Said3 == True or outputRand == 4 and Said4 == True or outputRand == 5 and Said5 == True or outputRand == 6 and Said6 == True or outputRand ==7 and Said7 == True or outputRand == 8 and Said8 == True:       
-            RandomIntGen(0, 9)
+        while randomJoke == 1 and Said1 == True or randomJoke == 2 and Said2 == True or randomJoke == 3 and Said3 == True or randomJoke == 4 and Said4 == True or randomJoke == 5 and Said5 == True or randomJoke == 6 and Said6 == True or randomJoke ==7 and Said7 == True or randomJoke == 8 and Said8 == True:       
+            RandomIntGen(1, 9)
         # When the user types more than one ".gluma" command, do not repeat the joke.
-        if outputRand == 1 and Said1 == False :
+        if randomJoke == 1 and Said1 == False :
             #The first joke
              await client.send_message(message.channel, 'Cum face masina de politie a dinozaurilor? NINO NINO DANONINO, Dar cea de pompieri? NINO NINO FireDINO')
              Said1 = True
                         
-        elif outputRand ==2 and Said2 == False :
+        elif randomJoke ==2 and Said2 == False :
             
             await client.send_message(message.channel, 'De ce nu alearga melcul ?!?')
             await asyncio.sleep(2)
@@ -95,21 +97,21 @@ async def on_message(message):
             Said2 = True
             
             
-        elif outputRand ==3 and Said3 == False :
+        elif randomJoke ==3 and Said3 == False :
             await client.send_message(message.channel, 'De ce nu se uita melcul in priza?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Pentru ca se curenteaza')
             Said3 = True
             
 
-        elif outputRand ==4 and Said4 == False :
+        elif randomJoke ==4 and Said4 == False :
             await client.send_message(message.channel, 'Tata, pot face baie daca am diaree?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Da, daca ai destula')
             Said4 = True
           
 
-        elif outputRand ==5 and Said5 == False :
+        elif randomJoke ==5 and Said5 == False :
             await client.send_message(message.channel, 'Era seara iar Alina trebuia sa faca baie, dar ii era lene... ')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Mama: -Alina, de ce nu vrei sa faci baie?')
@@ -118,7 +120,7 @@ async def on_message(message):
             Said5 = True
             
         
-        elif outputRand ==6 and Said6 == False:
+        elif randomJoke ==6 and Said6 == False:
             await client.send_message(message.channel, 'Alexandra: -Mama, tata s-a imbatat')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Mama: -De unde stii?')
@@ -127,7 +129,7 @@ async def on_message(message):
             Said6 = True
             
 
-        elif outputRand ==7 and Said7 == False :
+        elif randomJoke ==7 and Said7 == False :
             await client.send_message(message.channel, '-Alex, stii bancul cu ieputele din baie?')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Alex: -Nu')
@@ -136,7 +138,7 @@ async def on_message(message):
             Said7 = True
            
 
-        elif outputRand ==8 and Said8 == False:
+        elif randomJoke ==8 and Said8 == False:
             await client.send_message(message.channel, 'Stii ce face ursul dupa ce se trezeste din hibernat?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Fute o laba')
@@ -160,6 +162,11 @@ async def PlayAudioFile(audiofile):
     voice = await client.join_voice_channel(channel)
     player = voice.create_ffmpeg_player(audiofile)
     player.start()
+    isDone = player.is_done()
+    if isDone :
+        player.stop()
+        voice.stop()
+    
 
 
 
@@ -173,7 +180,6 @@ async def EnterVoiceChannel():
 #Function for generating a random number  
 def RandomIntGen(inputNumber1, inputNumber2):
     inputNumber = random.randrange(inputNumber1, inputNumber2)
-    global outputRand
     outputRand = inputNumber
     return outputRand
 
