@@ -44,7 +44,7 @@ async def on_message(message):
         test = await client.send_message(message.channel, "Da, functionez!")
         
     elif message.content.startswith('.debug'):
-        test1 = RandomIntGen(0 ,2)
+        test1 = RandomIntGen(0 ,1)
         test2 = await client.send_message(message.server, "Vlaoare: " + str(test1))
         print(str(test1))
         
@@ -67,7 +67,7 @@ async def on_message(message):
         
         
     elif message.content.startswith('.gluma'):
-        randomJoke = RandomIntGen(0, 9)
+        randomJoke = RandomIntGen(1, 9)
         ResetJokes()
         global Said1
         global Said2
@@ -82,7 +82,7 @@ async def on_message(message):
         # If the same random number was generated, generate another in order for the bot to respond
 
         while randomJoke == 1 and Said1 == True or randomJoke == 2 and Said2 == True or randomJoke == 3 and Said3 == True or randomJoke == 4 and Said4 == True or randomJoke == 5 and Said5 == True or randomJoke == 6 and Said6 == True or randomJoke ==7 and Said7 == True or randomJoke == 8 and Said8 == True:       
-            RandomIntGen(1, 9)
+            randomJoke = RandomIntGen(1, 9)
         # When the user types more than one ".gluma" command, do not repeat the joke.
         if randomJoke == 1 and Said1 == False :
             #The first joke
