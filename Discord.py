@@ -7,29 +7,35 @@ import math
 import os
 import discord
 import asyncio
+import opuslib
 
 version = 0.3
 
+if not discord.opus.is_loaded():
+    discord.opus.load_opus('opus')
+
+
 #Varialbes for the ".gluma" command
 
-Said1 = False
-Said2 = False
-Said3 = False
-Said4 = False
-Said5 = False
-Said6 = False 
-Said7 = False
-Said8 = False
-Said9 = False
+said_1 = False
+said_2 = False
+said_3 = False
+said_4 = False
+said_5 = False
+said_6 = False 
+said_7 = False
+said_8 = False
+said_9 = False
 
 #Create the client
 
 client = discord.Client()
 
+
 @client.event
 async def on_ready():
-    isStarted = True
-    if isStarted == True:
+    is_started = True
+    if is_started:
         print("RoBot in actiune...")
     else:
         print("Eroare...")
@@ -44,21 +50,22 @@ async def on_message(message):
         test = await client.send_message(message.channel, "Da, functionez!")
         
     elif message.content.startswith('.debug'):
-        test1 = RandomIntGen(0 ,1)
-        test2 = await client.send_message(message.server, "Vlaoare: " + str(test1))
-        print(str(test1))
+        print(str(message.channel) + str(messa))
+        #voice = await client.join_voice_channel(channel)
+        #player = voice.create_ffmpeg_player(audio_file)
+        #player.start()
         
 
     elif message.content.startswith('.amuzant'):
         await client.send_message(message.channel, 'Esti asa de amuzant, am uitat sa rad...')
-        await PlayAudioFile('amuzant.mp3')
+        await play_audio_file('amuzant.mp3')
 
     elif message.content.startswith('.taie'):
-        await PlayAudioFile('taie.mp3')
+        await play_audio_file('taie.mp3')
 
     elif message.content.startswith('.muzica'):
         
-        await PlayYoutubeURL(inputURL)
+        await play_youtube_url(input_url)
         
 
     elif message.content.startswith('.versiune'):
@@ -67,82 +74,82 @@ async def on_message(message):
         
         
     elif message.content.startswith('.gluma'):
-        randomJoke = RandomIntGen(1, 9)
-        ResetJokes()
-        global Said1
-        global Said2
-        global Said3
-        global Said4
-        global Said5
-        global Said6
-        global Said7
-        global Said8
-        global Said9
+        random_joke = random_int_gen(1, 9)
+        reset_jokes()
+        global said_1
+        global said_2
+        global said_3
+        global said_4
+        global said_5                
+        global said_6
+        global said_7
+        global said_8
+        global said_9
 
         # If the same random number was generated, generate another in order for the bot to respond
 
-        while randomJoke == 1 and Said1 == True or randomJoke == 2 and Said2 == True or randomJoke == 3 and Said3 == True or randomJoke == 4 and Said4 == True or randomJoke == 5 and Said5 == True or randomJoke == 6 and Said6 == True or randomJoke ==7 and Said7 == True or randomJoke == 8 and Said8 == True:       
-            randomJoke = RandomIntGen(1, 9)
+        while random_joke == 1 and said_1 == True or random_joke == 2 and said_2 == True or random_joke == 3 and said_3 == True or random_joke == 4 and said_4 == True or random_joke == 5 and said_5 == True or random_joke == 6 and said_6 == True or random_joke ==7 and said_7 == True or random_joke == 8 and said_8 == True:       
+            random_joke = random_int_gen(1, 9)
         # When the user types more than one ".gluma" command, do not repeat the joke.
-        if randomJoke == 1 and Said1 == False :
+        if random_joke == 1 and said_1 == False :
             #The first joke
              await client.send_message(message.channel, 'Cum face masina de politie a dinozaurilor? NINO NINO DANONINO, Dar cea de pompieri? NINO NINO FireDINO')
-             Said1 = True
+             said_1 = True
                         
-        elif randomJoke ==2 and Said2 == False :
+        elif random_joke ==2 and said_2 == False :
             
             await client.send_message(message.channel, 'De ce nu alearga melcul ?!?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Pentru ca ii falfaie ochii')
-            Said2 = True
+            said_2 = True
             
             
-        elif randomJoke ==3 and Said3 == False :
+        elif random_joke ==3 and said_3 == False :
             await client.send_message(message.channel, 'De ce nu se uita melcul in priza?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Pentru ca se curenteaza')
-            Said3 = True
+            said_3 = True
             
 
-        elif randomJoke ==4 and Said4 == False :
+        elif random_joke ==4 and said_4 == False :
             await client.send_message(message.channel, 'Tata, pot face baie daca am diaree?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Da, daca ai destula')
-            Said4 = True
+            said_4 = True
           
 
-        elif randomJoke ==5 and Said5 == False :
+        elif random_joke ==5 and said_5 == False :
             await client.send_message(message.channel, 'Era seara iar Alina trebuia sa faca baie, dar ii era lene... ')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Mama: -Alina, de ce nu vrei sa faci baie?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Alina: Pentru ca e uda')
-            Said5 = True
+            said_5 = True
             
         
-        elif randomJoke ==6 and Said6 == False:
+        elif random_joke ==6 and said_6 == False:
             await client.send_message(message.channel, 'Alexandra: -Mama, tata s-a imbatat')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Mama: -De unde stii?')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Alexandra: -Barbiereste oglinda din baie')
-            Said6 = True
+            said_6 = True
             
 
-        elif randomJoke ==7 and Said7 == False :
+        elif random_joke ==7 and said_7 == False :
             await client.send_message(message.channel, '-Alex, stii bancul cu ieputele din baie?')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Alex: -Nu')
             await asyncio.sleep(1)
             await client.send_message(message.channel, 'Nici eu, era usa inchisa...')
-            Said7 = True
+            said_7 = True
            
 
-        elif randomJoke ==8 and Said8 == False:
+        elif random_joke ==8 and said_8 == False:
             await client.send_message(message.channel, 'Stii ce face ursul dupa ce se trezeste din hibernat?')
             await asyncio.sleep(2)
             await client.send_message(message.channel, 'Fute o laba')
-            Said8 = True
+            said_8 = True
 
     elif message.content.startswith('.comenzi'):
         await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzica url_youtube - nu functioneaza momentan')
@@ -151,39 +158,34 @@ async def on_message(message):
 
 #Function for playing a specific YouTube URL
 
-async def PlayYoutubeURL(youtubeURL):
+async def play_youtube_url(youtube_url):
     channel = client.get_channel('267686533593694208')
     voice = await client.join_voice_channel(channel)
-    player = await voice.create_ytdl_player(youtubeURL)
+    player = await voice.create_ytdl_player(youtube_url)
     player.start()
 
-async def PlayAudioFile(audiofile):
+async def play_audio_file(audio_file):
     channel = client.get_channel('267686533593694208')
     voice = await client.join_voice_channel(channel)
-    player = voice.create_ffmpeg_player(audiofile)
+    player = voice.create_ffmpeg_player(audio_file)
     player.start()
-    isDone = player.is_done()
-    if isDone :
-        player.stop()
-        voice.stop()
     
-
 
 
 
 #Function in ordedr for the bot to join a voice channel
 
-async def EnterVoiceChannel():
+async def enter_voice_channel():
     channel = client.get_channel('267686533593694208')
     await client.join_voice_channel(channel)
 
 #Function for generating a random number  
-def RandomIntGen(inputNumber1, inputNumber2):
-    inputNumber = random.randrange(inputNumber1, inputNumber2)
-    outputRand = inputNumber
-    return outputRand
+def random_int_gen(input_number1, input_number2):
+    input_number = random.randrange(input_number1, input_number2)
+    output_rand = input_number
+    return output_rand
 
-async def GetInfo():
+async def get_info():
     destChannel = client.get_channel(id)
     destServer = client.get_server(id)
     print (str(destChannel))
@@ -191,31 +193,31 @@ async def GetInfo():
 
             
         
-def ResetJokes():
+def reset_jokes():
     #Acces the variables declared uptop.
-    global Said1
-    global Said2
-    global Said3
-    global Said4
-    global Said5
-    global Said6
-    global Said7
-    global Said8
-    global Said9
+    global said_1
+    global said_2
+    global said_3
+    global said_4
+    global said_5
+    global said_6
+    global said_7
+    global said_8
+    global said_9
 
     # If all the jokes were said...
 
-    if Said1 == True and Said2 == True and Said3 == True and Said4 == True and Said5 == True and Said6 == True and Said7 == True and Said8 == True :
+    if said_1 == True and said_2 == True and said_3 == True and said_4 == True and said_5 == True and said_6 == True and said_7 == True and said_8 == True :
         # Than reset the booleans to False, in order to say the same jokes again... I know, this bot is all a joke...
-        Said1 = False
-        Said2 = False
-        Said3 = False
-        Said4 = False
-        Said5 = False
-        Said6 = False
-        Said7 = False
-        Said8 = False
-        Said9 = False
+        said_1 = False
+        said_2 = False
+        said_3 = False
+        said_4 = False
+        said_5 = False
+        said_6 = False
+        said_7 = False
+        said_8 = False
+        said_9 = False
         
         
         
@@ -223,6 +225,6 @@ def ResetJokes():
         
 # Run the bot. Put your own discord Token code in 'quotes'.
 
-client.run('MzE0NDY1OTU2NzExNjI4ODAx.C_8o2Q.gWZxOd_zlaTHiDeIIwssfazSCaM')
+client.run('YOUR_TOKEN_HERE')
 
 
