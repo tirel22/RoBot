@@ -9,10 +9,13 @@ import discord
 import asyncio
 import opuslib
 
-version = 0.3
+version = 0.4
 
 if not discord.opus.is_loaded():
-    discord.opus.load_opus('opus')
+    try:
+        discord.opus.load_opus('opus')
+    except:
+        pass
 
 
 #Varialbes for the ".gluma" command
@@ -50,10 +53,8 @@ async def on_message(message):
         test = await client.send_message(message.channel, "Da, functionez!")
         
     elif message.content.startswith('.debug'):
-        print(str(message.channel) + str(messa))
-        #voice = await client.join_voice_channel(channel)
-        #player = voice.create_ffmpeg_player(audio_file)
-        #player.start()
+        print(message.server.id)
+        print()
         
 
     elif message.content.startswith('.amuzant'):
@@ -64,8 +65,16 @@ async def on_message(message):
         await play_audio_file('taie.mp3')
 
     elif message.content.startswith('.muzica'):
+        user_url = message.content
+        try:
+            procces_url = user_url.replace('.muzica', '')
+            output_url = procces_url.strip()
+            await client.send_message(message.channel, 'Sigur, adaug in playlist ' + output_url)
+            await play_youtube_url(output_url)
+        except:
+            pass
+
         
-        await play_youtube_url(input_url)
         
 
     elif message.content.startswith('.versiune'):
