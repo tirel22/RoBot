@@ -7,14 +7,15 @@ import math
 import os
 import discord
 import asyncio
-import opuslib
 
-version = 0.4
+version = 0.5
 
 if not discord.opus.is_loaded():
     try:
+        import opuslib
         discord.opus.load_opus('opus')
     except:
+        print('OpusLib nu a fost gasit.')
         pass
 
 
