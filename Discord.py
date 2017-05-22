@@ -8,7 +8,7 @@ import os
 import discord
 import asyncio
 
-version = 0.5
+version = 0.5.1
 
 if not discord.opus.is_loaded():
     try:
@@ -30,8 +30,6 @@ said_6 = False
 said_7 = False
 said_8 = False
 said_9 = False
-
-# Variable for YouTube music
 
 #Create the client
 
