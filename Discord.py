@@ -30,6 +30,9 @@ said_7 = False
 said_8 = False
 said_9 = False
 
+# Variable for YouTube music
+invalid_url = False
+
 #Create the client
 
 client = discord.Client()
@@ -66,13 +69,16 @@ async def on_message(message):
 
     elif message.content.startswith('.muzica'):
         user_url = message.content
-        try:
-            procces_url = user_url.replace('.muzica', '')
-            output_url = procces_url.strip()
+        procces_url = user_url.replace('.muzica', '')
+        output_url = procces_url.strip()
+        await play_youtube_url(output_url)
+        global invalid_url
+        print(str(invalid_url))
+        if invalid_url:
+            await client.send_message(message.channel, 'URL-ul nu este valid')
+        else:
             await client.send_message(message.channel, 'Sigur, adaug in playlist ' + output_url)
-            await play_youtube_url(output_url)
-        except:
-            pass
+        
 
         
         
@@ -161,23 +167,31 @@ async def on_message(message):
             said_8 = True
 
     elif message.content.startswith('.comenzi'):
-        await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzica url_youtube - nu functioneaza momentan')
+        await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzica url_youtube / cuvant cheie - bot-ul insta in voice channel-ul in care se afla \n si utilizatorul care l-a invocat si reda audio-u mentionat.')
             
             
 
 #Function for playing a specific YouTube URL
 
 async def play_youtube_url(youtube_url):
-    channel = client.get_channel('267686533593694208')
-    voice = await client.join_voice_channel(channel)
-    player = await voice.create_ytdl_player(youtube_url)
-    player.start()
+    channel = client.get_channel('314466222811119617')
+    if len(youtube_url) == 51:
+        voice = await client.join_voice_channel(channel)
+        player = await voice.create_ytdl_player(youtube_url)
+        player.start()
+        global invalid_url
+        invalid_url = False
+    else:
+        invalid_url = True
+        return
+    
 
 async def play_audio_file(audio_file):
-    channel = client.get_channel('267686533593694208')
+    channel = client.get_channel('314466222811119617')
     voice = await client.join_voice_channel(channel)
     player = voice.create_ffmpeg_player(audio_file)
     player.start()
+    
     
 
 
