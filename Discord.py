@@ -32,7 +32,6 @@ said_8 = False
 said_9 = False
 
 # Variable for YouTube music
-invalid_url = False
 
 #Create the client
 
@@ -72,10 +71,8 @@ async def on_message(message):
         user_url = message.content
         procces_url = user_url.replace('.muzica', '')
         output_url = procces_url.strip()
-        await play_youtube_url(output_url)
-        global invalid_url
-        print(str(invalid_url))
-        if invalid_url:
+        start_youtube_player = await play_youtube_url(output_url)
+        if start_youtube_player == 'URL_ERROR' :
             await client.send_message(message.channel, 'URL-ul nu este valid')
         else:
             await client.send_message(message.channel, 'Sigur, adaug in playlist ' + output_url)
@@ -176,15 +173,12 @@ async def on_message(message):
 
 async def play_youtube_url(youtube_url):
     channel = client.get_channel('314466222811119617')
-    if len(youtube_url) == 51:
+    if youtube_url.startswith('https://www.youtube.com/watch?v='):
         voice = await client.join_voice_channel(channel)
         player = await voice.create_ytdl_player(youtube_url)
         player.start()
-        global invalid_url
-        invalid_url = False
     else:
-        invalid_url = True
-        return
+        return 'URL_ERROR'
     
 
 async def play_audio_file(audio_file):
