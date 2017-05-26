@@ -62,11 +62,11 @@ async def on_message(message):
     elif message.content.startswith('.amuzant'):
         user_voice_channel = message.author.voice_channel.id
         await client.send_message(message.channel, 'Esti asa de amuzant, am uitat sa rad...')
-        await play_audio_file('amuzant.mp3', user_voice_channel)
+        await play_audio_file('amuzant.mp3', user_voice_channel, 5)
 
     elif message.content.startswith('.taie'):
         user_voice_channel = message.author.voice_channel.id
-        await play_audio_file('taie.mp3', user_voice_channel)
+        await play_audio_file('taie.mp3', user_voice_channel, 3)
 
     elif message.content.startswith('.muzica'):
         user_url = message.content
@@ -80,7 +80,9 @@ async def on_message(message):
 
             returned_youtube_url = search_youtube_url(final_user_keyword)
             user_voice_channel = message.author.voice_channel.id
-            start_youtube_player = await play_youtube_url(returned_youtube_url, user_voice_channel)
+            user_server = message.author.server.id
+            print(user_server)
+            start_youtube_player = await play_youtube_url(returned_youtube_url, user_voice_channel, user_server)
 
             if returned_youtube_url == 'URL_NOT_FOUND':
                 await client.send_message(message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + final_user_keyword + ' "]')
@@ -90,11 +92,12 @@ async def on_message(message):
                 await client.send_message(message.channel, 'Sigur, adaug in playlist ' + returned_youtube_url)
         else:
             user_voice_channel = message.author.voice_channel.id
-            start_youtube_player = await play_youtube_url(output_url, user_voice_channel)
+            user_server = message.author.server.id
+            start_youtube_player = await play_youtube_url(output_url, user_voice_channel, user_server)
 
             if start_youtube_player == 'YOUTUBE_URL_SUCCES':
                 await client.send_message(message.channel, 'Sigur, adaug in playlist ' + output_url)
-                youtube_playlist(output_url)
+                youtube_playlist(output_url, False)
         
         if start_youtube_player == 'URL_ERROR':
             await client.send_message(message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
@@ -190,15 +193,16 @@ async def on_message(message):
         await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzica url_youtube / cuvant cheie - bot-ul insta in voice channel-ul in care se afla \n si utilizatorul care l-a invocat si reda audio-u mentionat.')
             
 #Function for playing a specific YouTube URL
-async def play_youtube_url(youtube_url, voice_channel_id):
+async def play_youtube_url(youtube_url, voice_channel_id, server_id):
     if youtube_url.startswith('https://www.youtube.com/watch?v=') or youtube_url.startswith('http://www.youtube.com/watch?v=') or youtube_url.startswith('https://youtu.be/'):
         channel = client.get_channel(voice_channel_id)
         try:
             voice = await client.join_voice_channel(channel)
             player = await voice.create_ytdl_player(youtube_url)
             player.start()
-            print(player.title)
-            print(player.duration)
+            add_to_playlist = youtube_playlist(youtube_url, True)
+            song_time = int(player.duration)
+            await exit_voice_channel(song_time, voice, 0, 0)    
             return 'YOUTUBE_URL_SUCCES'
         except:
             return 'PLAYER_ERROR'
@@ -219,28 +223,39 @@ def search_youtube_url(user_keyword):
         return 'URL_NOT_FOUND'
 
 #Function for adding songs to a playlist
-def youtube_playlist(song_url):
-    song_list_url = []
-    song_list_url.append(song_url)
-    print(str(song_list_url[0:]))
+def youtube_playlist(song_url, add_to_playlist):
+    counter = -1
+    if add_to_playlist:
+        counter +=1
+        song_list_url = []
+        song_list_url.append(song_url)
+        print(str(song_list_url[counter:]))
+        print(counter)
+        return 'YOUTUBE_URL_SUCCES'
+    else:
+        return str(song_list_url[counter:])
 
 
 
         
 # Function for playing any aduio file
-async def play_audio_file(audio_file, voice_channel_id):
+async def play_audio_file(audio_file, voice_channel_id, audio_duration):
     channel = client.get_channel(voice_channel_id)
     voice = await client.join_voice_channel(channel)
     player = voice.create_ffmpeg_player(audio_file)
     player.start()
-    if player.is_done():
-        print('done')
+    await exit_voice_channel(audio_duration, voice, 0, 0)
     
     
 #Function in ordedr for the bot to join a voice channel
 async def enter_voice_channel():
     channel = client.get_channel('314466222811119617')
     await client.join_voice_channel(channel)
+
+async def exit_voice_channel(exit_time, voice_connection, id_of_voice_channel, id_of_server):
+    await asyncio.sleep(exit_time)
+    await voice_connection.disconnect()
+
 
 #Function for generating a random number  
 def random_int_gen(input_number1, input_number2):
