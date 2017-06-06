@@ -40,85 +40,62 @@ client = discord.Client()
 
 @client.event
 async def on_ready():
-    is_started = True
-    if is_started:
         print("RoBot in actiune...")
-    else:
-        print("Eroare...")
-       
   
 # When the user types a command...
 
 @client.event
 async def on_message(message):
 
+    try:
+        info = GetInfo(message)
+    except AttributeError:
+        return
+
     if message.content.startswith('.test'):
         test = await client.send_message(message.channel, "Da, functionez!")
         
-    elif message.content.startswith('.debug'):
-        member = message.author.voice_channel      
+    elif message.content.startswith('.debug'):  
+        print(message.channel)
 
     elif message.content.startswith('.amuzant'):
-        user_voice_channel = message.author.voice_channel.id
-        await client.send_message(message.channel, 'Esti asa de amuzant, am uitat sa rad...')
-        start_playing_file = await play_audio_file('amuzant.mp3', user_voice_channel, 5)
+        start_playing_file = await play_audio_file('amuzant.mp3', info.user_voice_ch_id, 5)
         if start_playing_file == False:
             await client.send_message(message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
 
     elif message.content.startswith('.taie'):
-        user_voice_channel = message.author.voice_channel.id
-        start_playing_file = await play_audio_file('taie.mp3', user_voice_channel, 3)
+        start_playing_file = await play_audio_file('taie.mp3', info.user_voice_ch_id, 3)
         if start_playing_file == False:
             await client.send_message(message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
 
     elif message.content.startswith('.muzica'):
-        user_url = message.content
-        procces_url = user_url.replace('.muzica', '')
+        procces_url = info.message_content.replace('.muzica', '')
         output_url = procces_url.strip()
 
         if output_url.startswith('-s'):
             prepare_user_keyword = output_url.replace('-s', '')
             final_user_keyword = prepare_user_keyword.strip()
             await client.send_message(message.channel, 'Caut pe YouTube [" ' + final_user_keyword + ' "]')
-            returned_youtube_url = search_youtube_url(final_user_keyword)
-            try:
-                user_voice_channel = message.author.voice_channel.id
-                user_server = message.author.server.id
-                set_player = YoutubePlayer(returned_youtube_url, user_voice_channel, user_server)
-                start_youtube_player = await set_player.play_youtube_url()
-            except:
-                await client.send_message(message.channel, 'Sunt confuz... In ce voice channel ar trebui sa intru? Ar fi minunat sa imi arati, ce zici daca te conectezi la unul.')
-                return
-
-            if returned_youtube_url == 'URL_NOT_FOUND':
-                await client.send_message(message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + final_user_keyword + ' "]')
-                return
-                
-            if start_youtube_player == 'YOUTUBE_URL_SUCCES':
-                await client.send_message(message.channel, 'Sigur, adaug in playlist ' + returned_youtube_url)
+            returned_youtube_url = await YoutubeSearch(final_user_keyword, message).search_youtube_url()
+            set_player = YoutubePlayer(returned_youtube_url, info.user_voice_ch_id, info.user_server_id, message)
+            start_youtube_player = await set_player.play_youtube_url()      
         else:
-            try:
-                user_voice_channel = message.author.voice_channel.id
-                user_server = message.author.server.id
-                set_player = YoutubePlayer(output_url, user_voice_channel, user_server)
-                start_youtube_player = await set_player.play_youtube_url()
-            except:
-                 await client.send_message(message.channel, 'Sunt confuz... In ce voice channel ar trebui sa intru? Ar fi minunat sa imi arati, ce zici daca te conectezi la unul.')
-                 return
+            set_player = YoutubePlayer(output_url, info.user_voice_ch_id, info.user_server_id, message)
+            start_youtube_player = await set_player.play_youtube_url() 
+                 
 
-            if start_youtube_player == 'YOUTUBE_URL_SUCCES':
-                await client.send_message(message.channel, 'Sigur, adaug in playlist ' + output_url)
-        
-        if start_youtube_player == 'URL_ERROR':
-            await client.send_message(message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
-
-        elif start_youtube_player == 'PLAYER_ERROR':
+        if start_youtube_player == 'PLAYER_ERROR':
             await client.send_message(message.channel, 'Exceptie. Probabil bot-ul se mai afla intr-un voice channel in server, sau URL-ul este protejat de drepturi de autor.')
 
 
     elif message.content.startswith('.versiune'):
         global version
-        await client.send_message(message.channel, 'RoBot v. ' + str(version))
+        await client.send_message(message.channel, 'RoBot v. ' + str(version) + ' ' + 'Discord.py API v. ' + discord.__version__)
+
+    elif message.content.startswith('.jet'):
+        pass
+
+                    
         
         
     elif message.content.startswith('.gluma'):
@@ -200,42 +177,63 @@ async def on_message(message):
             said_8 = True
 
     elif message.content.startswith('.comenzi'):
-        await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzica url_youtube / cuvant cheie - bot-ul insta in voice channel-ul in care se afla \n si utilizatorul care l-a invocat si reda audio-u mentionat.')
-            
+        await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzi_youtube / cuvant cheie - bot-ul insta in voice channel-ul in care se afla \n si utilizatorul care l-a invocat si reda audio-u mentionat.')
+
+class GetInfo:
+    def __init__(self, message):
+        self.user_voice_ch_id = message.author.voice_channel.id
+        self.user_server_id = message.author.server.id
+        self.message_content = message.content
+        self.message = message
+
+
 class YoutubePlayer:
-    def __init__(self, youtube_url, voice_channel_id, server_id):
+    def __init__(self, youtube_url, voice_channel_id, server_id, message):
         self.youtube_url = youtube_url
         self.voice_channel_id = voice_channel_id
         self.server_id = server_id
+        self.channel = client.get_channel(self.voice_channel_id)
+        self.message = message
+        
 
     #Function for playing a specific YouTube URL
     async def play_youtube_url(self):
         if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
-            channel = client.get_channel(self.voice_channel_id)
             try:
-                voice = await client.join_voice_channel(channel)
-                player = await voice.create_ytdl_player(self.youtube_url)
-                player.start()
-                add_to_playlist = youtube_playlist(self.youtube_url, True, -1)
-                song_time = int(player.duration)
-                await exit_voice_channel(song_time, voice, 0, 0)    
-                return 'YOUTUBE_URL_SUCCES'
+                self.voice = await client.join_voice_channel(self.channel)
             except:
-                return 'PLAYER_ERROR'
+                await client.send_message(self.message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
+                return
+            self.player = await self.voice.create_ytdl_player(self.youtube_url)
+            self.player.start()
+            add_to_playlist = youtube_playlist(self.youtube_url, True, -1)
+            song_time = int(self.player.duration)
+            await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+            await exit_voice_channel(song_time, self.voice)
+            return self.voice
+                   # await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori problema cu drepturile de autor, ori link-ul este gresit.')
+               
         else:
+            await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
             return 'URL_ERROR'
 
+class YoutubeSearch:
+    def __init__(self, user_keyword, message):
+        self.user_keyword = user_keyword
+        self.message = message
+    
 #Function for searching a YouTube url based on keywords
-def search_youtube_url(user_keyword):
-    try:
-        # Modified code form Grant Curell, https://www.codeproject.com/Articles/873060/Python-Search-Youtube-for-Video. License: GPLv3.
-        query_string = urllib.parse.urlencode({"search_query" : user_keyword})
-        html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
-        search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
-        return ("http://www.youtube.com/watch?v=" + search_results[0])
-    # End of copyright
-    except:
-        return 'URL_NOT_FOUND'
+    async def search_youtube_url(self):
+        try:
+            # Modified code form Grant Curell, https://www.codeproject.com/Articles/873060/Python-Search-Youtube-for-Video. License: GPLv3.
+            query_string = urllib.parse.urlencode({"search_query" : self.user_keyword})
+            html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
+            search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
+            return ("http://www.youtube.com/watch?v=" + search_results[0])
+        # End of copyright
+        except:
+             await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
+             return
 
 #Function for adding songs to a playlist
 def youtube_playlist(song_url, add_to_playlist, counter):
@@ -256,7 +254,7 @@ async def play_audio_file(audio_file, voice_channel_id, audio_duration):
         voice = await client.join_voice_channel(channel)
         player = voice.create_ffmpeg_player(audio_file)
         player.start()
-        await exit_voice_channel(audio_duration, voice, 0, 0)
+        await exit_voice_channel(audio_duration, voice)
     except:
         return False
 
@@ -268,7 +266,7 @@ async def enter_voice_channel():
     channel = client.get_channel('314466222811119617')
     await client.join_voice_channel(channel)
 
-async def exit_voice_channel(exit_time, voice_connection, id_of_voice_channel, id_of_server):
+async def exit_voice_channel(exit_time, voice_connection):
     await asyncio.sleep(exit_time)
     await voice_connection.disconnect()
 
@@ -306,10 +304,7 @@ def reset_jokes():
         said_8 = False
         said_9 = False
         
-        
-        
-
-        
+               
 # Run the bot. Put your own discord Token code in 'quotes'.
 
 client.run('YOUR_TOKEN_HERE')
