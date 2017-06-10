@@ -18,7 +18,7 @@ if not discord.opus.is_loaded():
         import opuslib
         discord.opus.load_opus('opus')
     except:
-        print('OpusLib nu a fost gasit.')
+        print('OpusLib nu a fost gasit. Bot-ul nu va putea sa intre in nici un voice channel. ')
 
 
 #Varialbes for the ".gluma" command
@@ -48,7 +48,7 @@ async def on_ready():
 async def on_message(message):
 
     try:
-        info = GetInfo(message)
+        info = GetInfo(message.author.voice_channel.id, message.author.server.id, message)
     except AttributeError:
         return
 
@@ -59,44 +59,36 @@ async def on_message(message):
         print(message.channel)
 
     elif message.content.startswith('.amuzant'):
-        start_playing_file = await play_audio_file('amuzant.mp3', info.user_voice_ch_id, 5)
+        start_playing_file = await play_audio_file('amuzant.mp3', info.channel, 5)
         if start_playing_file == False:
             await client.send_message(message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
 
     elif message.content.startswith('.taie'):
-        start_playing_file = await play_audio_file('taie.mp3', info.user_voice_ch_id, 3)
+        start_playing_file = await play_audio_file('taie.mp3', info.channel, 3)
         if start_playing_file == False:
             await client.send_message(message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
 
     elif message.content.startswith('.muzica'):
-        procces_url = info.message_content.replace('.muzica', '')
-        output_url = procces_url.strip()
+        output_url = info.message_content.replace('.muzica', '').strip()
 
         if output_url.startswith('-s'):
-            prepare_user_keyword = output_url.replace('-s', '')
-            final_user_keyword = prepare_user_keyword.strip()
+            final_user_keyword = output_url.replace('-s', '').strip()
+
             await client.send_message(message.channel, 'Caut pe YouTube [" ' + final_user_keyword + ' "]')
+
             returned_youtube_url = await YoutubeSearch(final_user_keyword, message).search_youtube_url()
-            set_player = YoutubePlayer(returned_youtube_url, info.user_voice_ch_id, info.user_server_id, message)
-            start_youtube_player = await set_player.play_youtube_url()      
+            start_youtube_player = await YoutubePlayer(returned_youtube_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url()   
         else:
-            set_player = YoutubePlayer(output_url, info.user_voice_ch_id, info.user_server_id, message)
-            start_youtube_player = await set_player.play_youtube_url() 
-                 
-
-        if start_youtube_player == 'PLAYER_ERROR':
-            await client.send_message(message.channel, 'Exceptie. Probabil bot-ul se mai afla intr-un voice channel in server, sau URL-ul este protejat de drepturi de autor.')
-
+            start_youtube_player = await YoutubePlayer(output_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url() 
 
     elif message.content.startswith('.versiune'):
         global version
         await client.send_message(message.channel, 'RoBot v. ' + str(version) + ' ' + 'Discord.py API v. ' + discord.__version__)
 
     elif message.content.startswith('.jet'):
+        #YoutubePlayer.create_voice_object(info.channel)
         pass
-
-                    
-        
+           
         
     elif message.content.startswith('.gluma'):
         random_joke = random_int_gen(1, 9)
@@ -180,49 +172,85 @@ async def on_message(message):
         await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzi_youtube / cuvant cheie - bot-ul insta in voice channel-ul in care se afla \n si utilizatorul care l-a invocat si reda audio-u mentionat.')
 
 class GetInfo:
-    def __init__(self, message):
+    def __init__(self, user_voice_ch_id, user_server_id, message):
         self.user_voice_ch_id = message.author.voice_channel.id
         self.user_server_id = message.author.server.id
         self.message_content = message.content
         self.message = message
+        self.channel = client.get_channel(self.user_voice_ch_id)
 
 
-class YoutubePlayer:
-    def __init__(self, youtube_url, voice_channel_id, server_id, message):
+class YoutubePlayer(GetInfo):
+    def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
-        self.voice_channel_id = voice_channel_id
-        self.server_id = server_id
-        self.channel = client.get_channel(self.voice_channel_id)
-        self.message = message
-        
+        self.song_list = None
+        super().__init__(user_voice_ch_id, user_server_id, message)
 
-    #Function for playing a specific YouTube URL
+    # Create a voice object that is unique per server. Isn't that cool? 
+    async def create_voice_object(self):
+        try:
+            self.voice = await client.join_voice_channel(self.channel)
+            return self.voice
+        except: 
+            add_to_playlsit = self.playlist()
+            return False
+
+    # The simplest playlist method that you have ever seen. Trust me.
+    def playlist(self):
+        try:
+            self.song_list = []
+            self.song_list.append(self.youtube_url)
+            print(self.song_list)
+            return self.song_list
+        except: 
+            return False
+
+    #Finally, play some music, grab a beer and relax.
     async def play_youtube_url(self):
         if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
+            voice = await self.create_voice_object()
             try:
-                self.voice = await client.join_voice_channel(self.channel)
+                player = await voice.create_ytdl_player(self.youtube_url)
+                player.start()
             except:
-                await client.send_message(self.message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
+                if voice != False:
+                    await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
+                    await exit_voice_channel(1, voice)
                 return
-            self.player = await self.voice.create_ytdl_player(self.youtube_url)
-            self.player.start()
-            add_to_playlist = youtube_playlist(self.youtube_url, True, -1)
-            song_time = int(self.player.duration)
+                
+            song_time = int(player.duration)
             await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
-            await exit_voice_channel(song_time, self.voice)
-            return self.voice
-                   # await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori problema cu drepturile de autor, ori link-ul este gresit.')
-               
+            #pass_voice_instance = get_voice_instance(voice)
+            await exit_voice_channel(song_time, voice)
+            check_playlist = self.playlist()
+            next_song = ''.join(check_playlist[0])
+            voice = await self.create_voice_object()
+            player = await self.voice.create_ytdl_player(next_song)
+            player.start()
+            song_time = int(player.duration)
+            await exit_voice_channel(song_time, voice)
         else:
             await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
-            return 'URL_ERROR'
+            return 
 
-class YoutubeSearch:
+class VoiceState(YoutubePlayer):
+    def __init__(self, bot):
+        self.current = None
+        self.voice = None
+        self.bot = bot
+
+    def get_voice_state(self):
+        if self.voice.is_playing():
+            print("playing")
+        else:
+            print('net playing')
+
+class YoutubeSearch():
     def __init__(self, user_keyword, message):
         self.user_keyword = user_keyword
         self.message = message
     
-#Function for searching a YouTube url based on keywords
+#Method for searching a YouTube url based on keywords
     async def search_youtube_url(self):
         try:
             # Modified code form Grant Curell, https://www.codeproject.com/Articles/873060/Python-Search-Youtube-for-Video. License: GPLv3.
@@ -235,36 +263,18 @@ class YoutubeSearch:
              await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
              return
 
-#Function for adding songs to a playlist
-def youtube_playlist(song_url, add_to_playlist, counter):
-    if add_to_playlist:
-        counter +=1
-        song_list_url = []
-        song_list_url.append(song_url)
-        print(str(song_list_url[counter:]))
-        print(counter)
-        return 'YOUTUBE_URL_SUCCES'
-    else:
-        return str(song_list_url[counter:])
+            
         
 # Function for playing any aduio file
-async def play_audio_file(audio_file, voice_channel_id, audio_duration):
+async def play_audio_file(audio_file, get_voice_channel_id, audio_duration):
     try:
-        channel = client.get_channel(voice_channel_id)
-        voice = await client.join_voice_channel(channel)
+        voice = await client.join_voice_channel(get_voice_channel_id)
         player = voice.create_ffmpeg_player(audio_file)
         player.start()
         await exit_voice_channel(audio_duration, voice)
     except:
         return False
 
-    
-    
-    
-#Function in ordedr for the bot to join a voice channel
-async def enter_voice_channel():
-    channel = client.get_channel('314466222811119617')
-    await client.join_voice_channel(channel)
 
 async def exit_voice_channel(exit_time, voice_connection):
     await asyncio.sleep(exit_time)
@@ -273,8 +283,7 @@ async def exit_voice_channel(exit_time, voice_connection):
 
 #Function for generating a random number  
 def random_int_gen(input_number1, input_number2):
-    input_number = random.randrange(input_number1, input_number2)
-    output_rand = input_number
+    output_rand = random.randrange(input_number1, input_number2)
     return output_rand
             
 
