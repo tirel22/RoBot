@@ -86,7 +86,6 @@ async def on_message(message):
         await client.send_message(message.channel, 'RoBot v. ' + str(version) + ' ' + 'Discord.py API v. ' + discord.__version__)
 
     elif message.content.startswith('.jet'):
-        #YoutubePlayer.create_voice_object(info.channel)
         pass
            
         
@@ -200,7 +199,7 @@ class YoutubePlayer(GetInfo):
         try:
             self.song_list = []
             self.song_list.append(self.youtube_url)
-            print(self.song_list)
+            print(self.song_list[0:])
             return self.song_list
         except: 
             return False
@@ -218,9 +217,9 @@ class YoutubePlayer(GetInfo):
                     await exit_voice_channel(1, voice)
                 return
                 
-            song_time = int(player.duration)
+            
             await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
-            #pass_voice_instance = get_voice_instance(voice)
+            song_time = int(player.duration)
             await exit_voice_channel(song_time, voice)
             check_playlist = self.playlist()
             next_song = ''.join(check_playlist[0])
@@ -233,17 +232,6 @@ class YoutubePlayer(GetInfo):
             await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
             return 
 
-class VoiceState(YoutubePlayer):
-    def __init__(self, bot):
-        self.current = None
-        self.voice = None
-        self.bot = bot
-
-    def get_voice_state(self):
-        if self.voice.is_playing():
-            print("playing")
-        else:
-            print('net playing')
 
 class YoutubeSearch():
     def __init__(self, user_keyword, message):
