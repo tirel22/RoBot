@@ -238,8 +238,9 @@ class YoutubePlayer(GetInfo):
             song_time = int(player.duration)
             await exit_voice_channel(song_time, voice)
             play_next = self.check_playlist(self.playlist_index(Playlist.matrix[0]))
-            #Playlist in development
-            if play_next != False:
+            #Playlist 
+            
+            while play_next != False:
                 voice = await self.create_voice_object()
                 player = await voice.create_ytdl_player(play_next)
                 player.start()
