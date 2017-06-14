@@ -10,6 +10,8 @@ import asyncio
 import urllib.request
 import urllib.parse
 import re
+from discord.ext import commands
+import collections
 
 version = 0.8
 
@@ -35,7 +37,7 @@ said_9 = False
 
 #Create the client
 
-client = discord.Client()
+client = commands.Bot(command_prefix=".")
 
 
 @client.event
@@ -182,7 +184,6 @@ class GetInfo:
 class YoutubePlayer(GetInfo):
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
-        self.song_list = None
         super().__init__(user_voice_ch_id, user_server_id, message)
 
     # Create a voice object that is unique per server. Isn't that cool? 
@@ -191,18 +192,33 @@ class YoutubePlayer(GetInfo):
             self.voice = await client.join_voice_channel(self.channel)
             return self.voice
         except: 
-            add_to_playlsit = self.playlist()
+            add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
+            await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
             return False
 
-    # The simplest playlist method that you have ever seen. Trust me.
-    def playlist(self):
+    def check_playlist(self, counter):
+        initial_check = Playlist.matrix[0]
         try:
-            self.song_list = []
-            self.song_list.append(self.youtube_url)
-            print(self.song_list[0:])
-            return self.song_list
-        except: 
+            check_server = ''.join(initial_check[counter])
+        except:
             return False
+        if int(check_server) == int(self.user_server_id):
+            check_song = Playlist.matrix[1]
+            song_to_play = ''.join(check_song[counter])
+            remove_current_song = Playlist.matrix[1].pop(counter)
+            remove_current_server = Playlist.matrix[0].pop(counter)
+            return song_to_play
+
+    def playlist_index(self, lst):
+        count = collections.Counter(lst)
+        duplicates = [i for i in count]
+        server_index = {}
+        for server in duplicates:
+            server_index[server] = [i for i, j in enumerate(lst)]
+            songs_in_server = server_index[self.user_server_id][0:]
+            remove_current_index = server_index[self.user_server_id].pop(0)
+            return songs_in_server[0]
+
 
     #Finally, play some music, grab a beer and relax.
     async def play_youtube_url(self):
@@ -221,13 +237,15 @@ class YoutubePlayer(GetInfo):
             await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
             song_time = int(player.duration)
             await exit_voice_channel(song_time, voice)
-            check_playlist = self.playlist()
-            next_song = ''.join(check_playlist[0])
-            voice = await self.create_voice_object()
-            player = await self.voice.create_ytdl_player(next_song)
-            player.start()
-            song_time = int(player.duration)
-            await exit_voice_channel(song_time, voice)
+            play_next = self.check_playlist(self.playlist_index(Playlist.matrix[0]))
+            #Playlist in development
+            if play_next != False:
+                voice = await self.create_voice_object()
+                player = await voice.create_ytdl_player(play_next)
+                player.start()
+                await exit_voice_channel(int(player.duration), voice)
+
+
         else:
             await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
             return 
@@ -251,6 +269,15 @@ class YoutubeSearch():
              await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
              return
 
+class Playlist:
+    matrix = [[] for x in range(2)]
+
+    # The simplest playlist method that you have ever seen. Trust me.
+    @classmethod
+    def add_to_playlist(cls, server, song):
+        cls.matrix[0].append(server)
+        cls.matrix[1].append(song)
+        print(cls.matrix)
             
         
 # Function for playing any aduio file
