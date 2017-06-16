@@ -205,8 +205,9 @@ class YoutubePlayer(GetInfo):
         if int(check_server) == int(self.user_server_id):
             check_song = Playlist.matrix[1]
             song_to_play = ''.join(check_song[counter])
-            remove_current_song = Playlist.matrix[1].pop(counter)
-            remove_current_server = Playlist.matrix[0].pop(counter)
+            if len(initial_check) > 1:
+                remove_current_song = Playlist.matrix[1].pop(counter)
+                remove_current_server = Playlist.matrix[0].pop(counter)
             return song_to_play
 
     def playlist_index(self, lst):
@@ -266,8 +267,8 @@ class YoutubeSearch():
             return ("http://www.youtube.com/watch?v=" + search_results[0])
         # End of copyright
         except:
-             await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
-             return
+            await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
+            return
 
 class Playlist:
     matrix = [[] for x in range(2)]
@@ -278,6 +279,15 @@ class Playlist:
         cls.matrix[0].append(server)
         cls.matrix[1].append(song)
         print(cls.matrix)
+
+class ForceExit(YoutubePlayer):
+    def __init__(self):
+        self.voice_connection = voice_connection
+
+    def voice_force_exit(self):
+        if self.create_voice_object() == False:
+            get_voice_instace
+        
             
         
 # Function for playing any aduio file
