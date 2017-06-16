@@ -237,12 +237,11 @@ class YoutubePlayer(GetInfo):
             await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
             song_time = int(player.duration)
             await exit_voice_channel(song_time, voice)
-            play_next = self.check_playlist(self.playlist_index(Playlist.matrix[0]))
             #Playlist 
             
-            while play_next != False:
+            while self.check_playlist(self.playlist_index(Playlist.matrix[0])) != False:
                 voice = await self.create_voice_object()
-                player = await voice.create_ytdl_player(play_next)
+                player = await voice.create_ytdl_player(self.check_playlist(self.playlist_index(Playlist.matrix[0])))
                 player.start()
                 await exit_voice_channel(int(player.duration), voice)
 
