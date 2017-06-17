@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-# This bot is written for roumanian users, but the documentation is in english. Also, this is my first python project, so the code isn't "ideal"
+""" This bot is written for romanian users, but the comments are in english. 
+    Also, this is my first python project, so the code isn't "ideal" """
 
 import random
 import math
@@ -13,7 +14,7 @@ import re
 from discord.ext import commands
 import collections
 
-version = 0.8
+version = 0.9
 
 if not discord.opus.is_loaded():
     try:
@@ -196,6 +197,15 @@ class YoutubePlayer(GetInfo):
             await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
             return False
 
+    """
+    Return what to play next. The 'counter' parameter is the index
+    for the next song in queue. PS: The 'matrix' is a 2d list, 
+    index[0] being the server-id, index[1] being the song-url.
+    matrix[0][1], for example, will contain the second server,
+    and matrix[1][1] will contain the specific song for that
+    server. Not the best way, but at least it works. Ik, it 
+    asks for trouble.
+    """
     def check_playlist(self, counter):
         initial_check = Playlist.matrix[0]
         try:
@@ -205,11 +215,13 @@ class YoutubePlayer(GetInfo):
         if int(check_server) == int(self.user_server_id):
             check_song = Playlist.matrix[1]
             song_to_play = ''.join(check_song[counter])
-            if len(initial_check) > 1:
-                remove_current_song = Playlist.matrix[1].pop(counter)
-                remove_current_server = Playlist.matrix[0].pop(counter)
+            remove_current_song = Playlist.matrix[1].pop(counter)
+            remove_current_server = Playlist.matrix[0].pop(counter)
             return song_to_play
 
+    
+    #Check all the servers with songs in queue and return the index.
+    
     def playlist_index(self, lst):
         count = collections.Counter(lst)
         duplicates = [i for i in count]
@@ -217,6 +229,7 @@ class YoutubePlayer(GetInfo):
         for server in duplicates:
             server_index[server] = [i for i, j in enumerate(lst)]
             songs_in_server = server_index[self.user_server_id][0:]
+            print(songs_in_server)
             remove_current_index = server_index[self.user_server_id].pop(0)
             return songs_in_server[0]
 
@@ -238,21 +251,25 @@ class YoutubePlayer(GetInfo):
             await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
             song_time = int(player.duration)
             await exit_voice_channel(song_time, voice)
-            #Playlist 
             
-            while self.check_playlist(self.playlist_index(Playlist.matrix[0])) != False:
-                voice = await self.create_voice_object()
-                player = await voice.create_ytdl_player(self.check_playlist(self.playlist_index(Playlist.matrix[0])))
-                player.start()
-                await exit_voice_channel(int(player.duration), voice)
-
-
+            #If a song is in queue, play it.
+            
+            while True:
+                check_next_song = self.check_playlist(self.playlist_index(Playlist.matrix[0]))
+                if check_next_song != False:
+                    voice = await self.create_voice_object()
+                    player = await voice.create_ytdl_player(check_next_song)
+                    player.start()
+                    await exit_voice_channel(int(player.duration), voice)
+                else:
+                    return
+                
         else:
             await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
             return 
 
 
-class YoutubeSearch():
+class YoutubeSearch:
     def __init__(self, user_keyword, message):
         self.user_keyword = user_keyword
         self.message = message
