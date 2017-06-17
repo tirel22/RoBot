@@ -89,7 +89,7 @@ async def on_message(message):
         await client.send_message(message.channel, 'RoBot v. ' + str(version) + ' ' + 'Discord.py API v. ' + discord.__version__)
 
     elif message.content.startswith('.jet'):
-        pass
+        await ForceExit(None, info.user_voice_ch_id, info.user_server_id, message).voice_force_exit()
            
         
     elif message.content.startswith('.gluma'):
@@ -183,6 +183,8 @@ class GetInfo:
 
 
 class YoutubePlayer(GetInfo):
+    voice_matrix = [[]for i in range(2)]
+    player_matrix = [[]for i in range(2)]
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
         super().__init__(user_voice_ch_id, user_server_id, message)
@@ -191,11 +193,47 @@ class YoutubePlayer(GetInfo):
     async def create_voice_object(self):
         try:
             self.voice = await client.join_voice_channel(self.channel)
+            pass_server = YoutubePlayer.voice_matrix[0].append(self.user_server_id)
+            pass_voice = YoutubePlayer.voice_matrix[1].append(self.voice)
+            print(YoutubePlayer.voice_matrix)
             return self.voice
         except: 
-            add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
-            await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+            if self.youtube_url != None:
+                add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
+                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+
             return False
+
+    def remove_voice_object(self):
+        index_to_remove = self.playlist_index(YoutubePlayer.voice_matrix[0])
+        remove_server = YoutubePlayer.voice_matrix[0].pop(index_to_remove)
+        remove_voice = YoutubePlayer.voice_matrix[1].pop(index_to_remove)
+
+    async def create_youtube_player(self, voice, youtube_url, message):
+        try:
+            player = await voice.create_ytdl_player(youtube_url)
+            player.start()
+        except:
+            if voice != False:
+                await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
+                await exit_voice_channel(1, voice)
+            return False
+
+        song_time = int(player.duration)
+        pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
+        pass_player_object = YoutubePlayer.player_matrix[1].append(player)
+        return song_time
+
+    """
+    Resource management for non-rack mounted servers with
+    compute power level less than 9000
+    """
+    def destroy_youtube_player(self):
+        index_to_destroy = self.playlist_index(YoutubePlayer.player_matrix[0])
+        destroy_player = YoutubePlayer.player_matrix[1][index_to_destroy].stop()
+        remove_server = YoutubePlayer.player_matrix[0].pop(index_to_destroy)
+        remove_player = YoutubePlayer.player_matrix[1].pop(index_to_destroy)
+        
 
     """
     Return what to play next. The 'counter' parameter is the index
@@ -238,32 +276,39 @@ class YoutubePlayer(GetInfo):
     async def play_youtube_url(self):
         if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
             voice = await self.create_voice_object()
-            try:
-                player = await voice.create_ytdl_player(self.youtube_url)
-                player.start()
-            except:
-                if voice != False:
-                    await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
-                    await exit_voice_channel(1, voice)
-                return
-                
-            
-            await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
-            song_time = int(player.duration)
-            await exit_voice_channel(song_time, voice)
-            
+            player = await self.create_youtube_player(voice, self.youtube_url, self.message)
+            if player != False:
+                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+                song_time = player
+                await exit_voice_channel(song_time, voice)
+                self.remove_voice_object()
+                self.destroy_youtube_player()
             #If a song is in queue, play it.
             
             while True:
                 check_next_song = self.check_playlist(self.playlist_index(Playlist.matrix[0]))
                 if check_next_song != False:
                     voice = await self.create_voice_object()
-                    player = await voice.create_ytdl_player(check_next_song)
-                    player.start()
-                    await exit_voice_channel(int(player.duration), voice)
+                    # For whatever reason, create_youtube_player is not working here.
+                    # For now, I will repeat that code, untill I can figure this out.
+                    try:
+                        player = await voice.create_ytdl_player(check_next_song)
+                        player.start()
+                    except:
+                        if voice != False:
+                            await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
+                            await exit_voice_channel(1, voice)
+                        break
+                    song_time = int(player.duration)
+                    pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
+                    pass_player_object = YoutubePlayer.player_matrix[1].append(player)
+                    await exit_voice_channel(song_time, voice)
+                    self.remove_voice_object()
+                    self.destroy_youtube_player()
                 else:
                     return
-                
+                    
+
         else:
             await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
             return 
@@ -298,12 +343,22 @@ class Playlist:
         print(cls.matrix)
 
 class ForceExit(YoutubePlayer):
-    def __init__(self):
-        self.voice_connection = voice_connection
+    def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
+        super().__init__(youtube_url, user_voice_ch_id, user_server_id, message)
 
-    def voice_force_exit(self):
-        if self.create_voice_object() == False:
-            get_voice_instace
+    async def voice_force_exit(self):
+        while True:
+            check_conn = await self.create_voice_object()
+            if check_conn == False:
+                get_server_index = self.playlist_index(self.voice_matrix[0])
+                get_voice_object = YoutubePlayer.voice_matrix[1][get_server_index]
+                await exit_voice_channel(1, get_voice_object)
+                self.remove_voice_object()
+            else:
+                await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
+                await exit_voice_channel(1, check_conn)
+
+            return
         
             
         
