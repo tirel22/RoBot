@@ -43,7 +43,7 @@ client = commands.Bot(command_prefix=".")
 
 @client.event
 async def on_ready():
-        print("RoBot in actiune...")
+    print("RoBot in actiune...")
   
 # When the user types a command...
 
@@ -112,8 +112,8 @@ async def on_message(message):
         # When the user types more than one ".gluma" command, do not repeat the joke.
         if random_joke == 1 and said_1 == False :
             #The first joke
-             await client.send_message(message.channel, 'Cum face masina de politie a dinozaurilor? NINO NINO DANONINO, Dar cea de pompieri? NINO NINO FireDINO')
-             said_1 = True
+            await client.send_message(message.channel, 'Cum face masina de politie a dinozaurilor? NINO NINO DANONINO, Dar cea de pompieri? NINO NINO FireDINO')
+            said_1 = True
                         
         elif random_joke == 2 and said_2 == False :
             
@@ -332,7 +332,7 @@ class YoutubeSearch:
             await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
             return
 
-class Playlist:
+class Playlist(YoutubePlayer):
     matrix = [[] for x in range(2)]
 
     # The simplest playlist method that you have ever seen. Trust me.
@@ -341,6 +341,11 @@ class Playlist:
         cls.matrix[0].append(server)
         cls.matrix[1].append(song)
         print(cls.matrix)
+
+    def output_trakcs(self):
+        server_to_search = self.playlist_index(Playlist.matrix[0])
+        
+        
 
 class ForceExit(YoutubePlayer):
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
@@ -353,12 +358,24 @@ class ForceExit(YoutubePlayer):
                 get_server_index = self.playlist_index(self.voice_matrix[0])
                 get_voice_object = YoutubePlayer.voice_matrix[1][get_server_index]
                 await exit_voice_channel(1, get_voice_object)
+                try:
+                    find_server = self.playlist_index(Playlist.matrix[0])
+                    tracks_found = True
+                except:
+                    pass
+                while tracks_found:
+                    try:
+                        force_remove_server = Playlist.matrix[0].pop(get_server_index)
+                        force_remove_track = Playlist.matrix[1].pop(get_server_index)
+                    except:
+                        break
                 self.remove_voice_object()
+                self.destroy_youtube_player()
+                return True
             else:
                 await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
                 await exit_voice_channel(1, check_conn)
-
-            return
+                return False
         
             
         
