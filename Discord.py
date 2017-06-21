@@ -36,15 +36,268 @@ said_7 = False
 said_8 = False
 said_9 = False
 
-#Create the client
-
 client = commands.Bot(command_prefix=".")
 
 
 @client.event
 async def on_ready():
     print("RoBot in actiune...")
-  
+
+class GetInfo:
+    def __init__(self, user_voice_ch_id, user_server_id, message):
+        self.user_voice_ch_id = message.author.voice_channel.id
+        self.user_server_id = message.author.server.id
+        self.message_content = message.content
+        self.message = message
+        self.channel = client.get_channel(self.user_voice_ch_id)
+
+
+class YoutubePlayer(GetInfo):
+    voice_matrix = [[]for i in range(2)]
+    player_matrix = [[]for i in range(2)]
+    def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
+        self.youtube_url = youtube_url
+        super().__init__(user_voice_ch_id, user_server_id, message)
+
+    # Create a voice object that is unique per server. Isn't that cool? 
+    async def create_voice_object(self):
+        try:
+            self.voice = await client.join_voice_channel(self.channel)
+            pass_server = YoutubePlayer.voice_matrix[0].append(self.user_server_id)
+            pass_voice = YoutubePlayer.voice_matrix[1].append(self.voice)
+            print(YoutubePlayer.voice_matrix)
+            return self.voice
+        except: 
+            if self.youtube_url != None:
+                add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
+                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+
+            return False
+
+    def remove_voice_object(self):
+        index_to_remove = self.find_list_duplicates(YoutubePlayer.voice_matrix[0])
+        remove_server = YoutubePlayer.voice_matrix[0].pop(index_to_remove)
+        remove_voice = YoutubePlayer.voice_matrix[1].pop(index_to_remove)
+
+    async def create_youtube_player(self, voice, youtube_url, message):
+        try:
+            player = await voice.create_ytdl_player(youtube_url)
+            player.start()
+        except:
+            if voice != False:
+                await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
+                await exit_voice_channel(1, voice)
+            return False
+
+        song_time = int(player.duration)
+        pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
+        pass_player_object = YoutubePlayer.player_matrix[1].append(player)
+        return song_time
+
+    """
+    Resource management for non-rack mounted servers with
+    compute power level less than 9000
+    """
+    def destroy_youtube_player(self):
+        index_to_destroy = self.find_list_duplicates(YoutubePlayer.player_matrix[0])
+        destroy_player = YoutubePlayer.player_matrix[1][index_to_destroy].stop()
+        remove_server = YoutubePlayer.player_matrix[0].pop(index_to_destroy)
+        remove_player = YoutubePlayer.player_matrix[1].pop(index_to_destroy)
+        
+
+    """
+    Return what to play next. The 'counter' parameter is the index
+    for the next song in queue. PS: The 'queue_dict' is a 2d list, 
+    index[0] being the server-id, index[1] being the song-url.
+    queue_dict[0][1], for example, will contain the second server,
+    and queue_dict[1][1] will contain the specific song for that
+    server. Not the best way, but at least it works. Ik, it 
+    asks for trouble.
+    """
+    def check_playlist(self, counter):
+        initial_check = Playlist.queue_dict[0]
+        try:
+            check_server = ''.join(initial_check[counter])
+        except:
+            return False
+        if int(check_server) == int(self.user_server_id):
+            check_song = Playlist.queue_dict[1]
+            song_to_play = ''.join(check_song[counter])
+            remove_current_song = Playlist.queue_dict[1].pop(counter)
+            remove_current_server = Playlist.queue_dict[0].pop(counter)
+            return song_to_play
+
+    
+    #Check all the servers with songs in queue and return the index.
+    
+    def find_list_duplicates(self, lst):
+        count = collections.Counter(lst)
+        duplicates = [i for i in count]
+        server_index = {}
+        for items in duplicates:
+            server_index[items] = [i for i, j in enumerate(lst)]
+            songs_in_server = server_index[self.user_server_id][0:]
+            print(songs_in_server)
+            remove_current_index = server_index[self.user_server_id].pop(0)
+            return songs_in_server[0]
+
+
+    #Finally, play some music, grab a beer and relax.
+    async def play_youtube_url(self):
+        if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
+            voice = await self.create_voice_object()
+            player = await self.create_youtube_player(voice, self.youtube_url, self.message)
+            if player != False:
+                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+                song_time = player
+                await exit_voice_channel(song_time, voice)
+                self.remove_voice_object()
+                self.destroy_youtube_player()
+            #If a song is in queue, play it.
+            
+            while True:
+                check_next_song = self.check_playlist(self.find_list_duplicates(Playlist.queue_dict[0]))
+                if check_next_song != False:
+                    voice = await self.create_voice_object()
+                    # For whatever reason, create_youtube_player is not working here.
+                    # For now, I will repeat that code, untill I can figure this out.
+                    try:
+                        player = await voice.create_ytdl_player(check_next_song)
+                        player.start()
+                    except:
+                        if voice != False:
+                            await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
+                            await exit_voice_channel(1, voice)
+                        break
+                    song_time = int(player.duration)
+                    pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
+                    pass_player_object = YoutubePlayer.player_matrix[1].append(player)
+                    await exit_voice_channel(song_time, voice)
+                    self.remove_voice_object()
+                    self.destroy_youtube_player()
+                else:
+                    return
+                    
+
+        else:
+            await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
+            return 
+
+
+class YoutubeSearch:
+    def __init__(self, user_keyword, message):
+        self.user_keyword = user_keyword
+        self.message = message
+    
+#Method for searching a YouTube url based on keywords
+    async def search_youtube_url(self):
+        try:
+            # Modified code form Grant Curell, https://www.codeproject.com/Articles/873060/Python-Search-Youtube-for-Video. License: GPLv3.
+            query_string = urllib.parse.urlencode({"search_query" : self.user_keyword})
+            html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
+            search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
+            return ("http://www.youtube.com/watch?v=" + search_results[0])
+        # End of copyright
+        except:
+            await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
+            return
+
+class Playlist(YoutubePlayer):
+    queue_dict = [[] for x in range(2)]
+
+    # The simplest playlist method that you have ever seen. Trust me.
+    @classmethod
+    def add_to_playlist(cls, server, song):
+        cls.queue_dict[0].append(server)
+        cls.queue_dict[1].append(song)
+        print(cls.queue_dict)
+
+    def output_trakcs(self):
+        server_to_search = self.find_list_duplicates(Playlist.queue_dict[0])
+        
+        
+
+class ForceExit(YoutubePlayer):
+    def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
+        super().__init__(youtube_url, user_voice_ch_id, user_server_id, message)
+
+    async def voice_force_exit(self):
+        while True:
+            check_conn = await self.create_voice_object()
+            if check_conn == False:
+                get_server_index = self.find_list_duplicates(self.voice_matrix[0])
+                get_voice_object = YoutubePlayer.voice_matrix[1][get_server_index]
+                await exit_voice_channel(1, get_voice_object)
+                try:
+                    find_server = self.find_list_duplicates(Playlist.queue_dict[0])
+                    tracks_found = True
+                except:
+                    pass
+                while tracks_found:
+                    try:
+                        force_remove_server = Playlist.queue_dict[0].pop(get_server_index)
+                        force_remove_track = Playlist.queue_dict[1].pop(get_server_index)
+                    except:
+                        break
+                self.remove_voice_object()
+                self.destroy_youtube_player()
+                break
+            else:
+                await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
+                await exit_voice_channel(1, check_conn)
+                break
+        
+            
+        
+# Function for playing any aduio file
+async def play_audio_file(audio_file, get_voice_channel_id, audio_duration):
+    try:
+        voice = await client.join_voice_channel(get_voice_channel_id)
+        player = voice.create_ffmpeg_player(audio_file)
+        player.start()
+        await exit_voice_channel(audio_duration, voice)
+    except:
+        return False
+
+
+async def exit_voice_channel(exit_time, voice_connection):
+    await asyncio.sleep(exit_time)
+    await voice_connection.disconnect()
+
+
+#Function for generating a random number  
+def random_int_gen(input_number1, input_number2):
+    output_rand = random.randrange(input_number1, input_number2)
+    return output_rand
+            
+
+def reset_jokes():
+    #Acces the variables declared uptop.
+    global said_1
+    global said_2
+    global said_3
+    global said_4
+    global said_5
+    global said_6
+    global said_7
+    global said_8
+    global said_9
+
+    # If all the jokes were said...
+
+    if said_1 == True and said_2 == True and said_3 == True and said_4 == True and said_5 == True and said_6 == True and said_7 == True and said_8 == True :
+        # Than reset the booleans to False, in order to say the same jokes again... I know, this bot is all a joke...
+        said_1 = False
+        said_2 = False
+        said_3 = False
+        said_4 = False
+        said_5 = False
+        said_6 = False
+        said_7 = False
+        said_8 = False
+        said_9 = False
+
+      
 # When the user types a command...
 
 @client.event
@@ -86,7 +339,7 @@ async def on_message(message):
 
     elif message.content.startswith('.versiune'):
         global version
-        await client.send_message(message.channel, 'RoBot v. ' + str(version) + ' ' + 'Discord.py API v. ' + discord.__version__)
+        await client.send_message(message.channel, 'RoBot v. {} Discord.py API v. {}'.format(version, discord.__version__))
 
     elif message.content.startswith('.jet'):
         await ForceExit(None, info.user_voice_ch_id, info.user_server_id, message).voice_force_exit()
@@ -172,261 +425,6 @@ async def on_message(message):
 
     elif message.content.startswith('.comenzi'):
         await client.send_message(message.channel, 'Comenzi: \n .test - Verifica daca functionez. \n .amuzant - Bot-ul intra in voice channel-ul in care se afla si utilizatorul care a invocat bot-ul \n si reda un material audio(recomandabil folosita in cazul in care un memnru din server face o gluma proasta) \n .gluma - Nu mai este nevoie de explicatie \n .muzi_youtube / cuvant cheie - bot-ul insta in voice channel-ul in care se afla \n si utilizatorul care l-a invocat si reda audio-u mentionat.')
-
-class GetInfo:
-    def __init__(self, user_voice_ch_id, user_server_id, message):
-        self.user_voice_ch_id = message.author.voice_channel.id
-        self.user_server_id = message.author.server.id
-        self.message_content = message.content
-        self.message = message
-        self.channel = client.get_channel(self.user_voice_ch_id)
-
-
-class YoutubePlayer(GetInfo):
-    voice_matrix = [[]for i in range(2)]
-    player_matrix = [[]for i in range(2)]
-    def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
-        self.youtube_url = youtube_url
-        super().__init__(user_voice_ch_id, user_server_id, message)
-
-    # Create a voice object that is unique per server. Isn't that cool? 
-    async def create_voice_object(self):
-        try:
-            self.voice = await client.join_voice_channel(self.channel)
-            pass_server = YoutubePlayer.voice_matrix[0].append(self.user_server_id)
-            pass_voice = YoutubePlayer.voice_matrix[1].append(self.voice)
-            print(YoutubePlayer.voice_matrix)
-            return self.voice
-        except: 
-            if self.youtube_url != None:
-                add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
-                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
-
-            return False
-
-    def remove_voice_object(self):
-        index_to_remove = self.playlist_index(YoutubePlayer.voice_matrix[0])
-        remove_server = YoutubePlayer.voice_matrix[0].pop(index_to_remove)
-        remove_voice = YoutubePlayer.voice_matrix[1].pop(index_to_remove)
-
-    async def create_youtube_player(self, voice, youtube_url, message):
-        try:
-            player = await voice.create_ytdl_player(youtube_url)
-            player.start()
-        except:
-            if voice != False:
-                await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
-                await exit_voice_channel(1, voice)
-            return False
-
-        song_time = int(player.duration)
-        pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
-        pass_player_object = YoutubePlayer.player_matrix[1].append(player)
-        return song_time
-
-    """
-    Resource management for non-rack mounted servers with
-    compute power level less than 9000
-    """
-    def destroy_youtube_player(self):
-        index_to_destroy = self.playlist_index(YoutubePlayer.player_matrix[0])
-        destroy_player = YoutubePlayer.player_matrix[1][index_to_destroy].stop()
-        remove_server = YoutubePlayer.player_matrix[0].pop(index_to_destroy)
-        remove_player = YoutubePlayer.player_matrix[1].pop(index_to_destroy)
-        
-
-    """
-    Return what to play next. The 'counter' parameter is the index
-    for the next song in queue. PS: The 'matrix' is a 2d list, 
-    index[0] being the server-id, index[1] being the song-url.
-    matrix[0][1], for example, will contain the second server,
-    and matrix[1][1] will contain the specific song for that
-    server. Not the best way, but at least it works. Ik, it 
-    asks for trouble.
-    """
-    def check_playlist(self, counter):
-        initial_check = Playlist.matrix[0]
-        try:
-            check_server = ''.join(initial_check[counter])
-        except:
-            return False
-        if int(check_server) == int(self.user_server_id):
-            check_song = Playlist.matrix[1]
-            song_to_play = ''.join(check_song[counter])
-            remove_current_song = Playlist.matrix[1].pop(counter)
-            remove_current_server = Playlist.matrix[0].pop(counter)
-            return song_to_play
-
-    
-    #Check all the servers with songs in queue and return the index.
-    
-    def playlist_index(self, lst):
-        count = collections.Counter(lst)
-        duplicates = [i for i in count]
-        server_index = {}
-        for server in duplicates:
-            server_index[server] = [i for i, j in enumerate(lst)]
-            songs_in_server = server_index[self.user_server_id][0:]
-            print(songs_in_server)
-            remove_current_index = server_index[self.user_server_id].pop(0)
-            return songs_in_server[0]
-
-
-    #Finally, play some music, grab a beer and relax.
-    async def play_youtube_url(self):
-        if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
-            voice = await self.create_voice_object()
-            player = await self.create_youtube_player(voice, self.youtube_url, self.message)
-            if player != False:
-                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
-                song_time = player
-                await exit_voice_channel(song_time, voice)
-                self.remove_voice_object()
-                self.destroy_youtube_player()
-            #If a song is in queue, play it.
-            
-            while True:
-                check_next_song = self.check_playlist(self.playlist_index(Playlist.matrix[0]))
-                if check_next_song != False:
-                    voice = await self.create_voice_object()
-                    # For whatever reason, create_youtube_player is not working here.
-                    # For now, I will repeat that code, untill I can figure this out.
-                    try:
-                        player = await voice.create_ytdl_player(check_next_song)
-                        player.start()
-                    except:
-                        if voice != False:
-                            await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
-                            await exit_voice_channel(1, voice)
-                        break
-                    song_time = int(player.duration)
-                    pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
-                    pass_player_object = YoutubePlayer.player_matrix[1].append(player)
-                    await exit_voice_channel(song_time, voice)
-                    self.remove_voice_object()
-                    self.destroy_youtube_player()
-                else:
-                    return
-                    
-
-        else:
-            await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
-            return 
-
-
-class YoutubeSearch:
-    def __init__(self, user_keyword, message):
-        self.user_keyword = user_keyword
-        self.message = message
-    
-#Method for searching a YouTube url based on keywords
-    async def search_youtube_url(self):
-        try:
-            # Modified code form Grant Curell, https://www.codeproject.com/Articles/873060/Python-Search-Youtube-for-Video. License: GPLv3.
-            query_string = urllib.parse.urlencode({"search_query" : self.user_keyword})
-            html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
-            search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
-            return ("http://www.youtube.com/watch?v=" + search_results[0])
-        # End of copyright
-        except:
-            await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
-            return
-
-class Playlist(YoutubePlayer):
-    matrix = [[] for x in range(2)]
-
-    # The simplest playlist method that you have ever seen. Trust me.
-    @classmethod
-    def add_to_playlist(cls, server, song):
-        cls.matrix[0].append(server)
-        cls.matrix[1].append(song)
-        print(cls.matrix)
-
-    def output_trakcs(self):
-        server_to_search = self.playlist_index(Playlist.matrix[0])
-        
-        
-
-class ForceExit(YoutubePlayer):
-    def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
-        super().__init__(youtube_url, user_voice_ch_id, user_server_id, message)
-
-    async def voice_force_exit(self):
-        while True:
-            check_conn = await self.create_voice_object()
-            if check_conn == False:
-                get_server_index = self.playlist_index(self.voice_matrix[0])
-                get_voice_object = YoutubePlayer.voice_matrix[1][get_server_index]
-                await exit_voice_channel(1, get_voice_object)
-                try:
-                    find_server = self.playlist_index(Playlist.matrix[0])
-                    tracks_found = True
-                except:
-                    pass
-                while tracks_found:
-                    try:
-                        force_remove_server = Playlist.matrix[0].pop(get_server_index)
-                        force_remove_track = Playlist.matrix[1].pop(get_server_index)
-                    except:
-                        break
-                self.remove_voice_object()
-                self.destroy_youtube_player()
-                return True
-            else:
-                await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
-                await exit_voice_channel(1, check_conn)
-                return False
-        
-            
-        
-# Function for playing any aduio file
-async def play_audio_file(audio_file, get_voice_channel_id, audio_duration):
-    try:
-        voice = await client.join_voice_channel(get_voice_channel_id)
-        player = voice.create_ffmpeg_player(audio_file)
-        player.start()
-        await exit_voice_channel(audio_duration, voice)
-    except:
-        return False
-
-
-async def exit_voice_channel(exit_time, voice_connection):
-    await asyncio.sleep(exit_time)
-    await voice_connection.disconnect()
-
-
-#Function for generating a random number  
-def random_int_gen(input_number1, input_number2):
-    output_rand = random.randrange(input_number1, input_number2)
-    return output_rand
-            
-
-def reset_jokes():
-    #Acces the variables declared uptop.
-    global said_1
-    global said_2
-    global said_3
-    global said_4
-    global said_5
-    global said_6
-    global said_7
-    global said_8
-    global said_9
-
-    # If all the jokes were said...
-
-    if said_1 == True and said_2 == True and said_3 == True and said_4 == True and said_5 == True and said_6 == True and said_7 == True and said_8 == True :
-        # Than reset the booleans to False, in order to say the same jokes again... I know, this bot is all a joke...
-        said_1 = False
-        said_2 = False
-        said_3 = False
-        said_4 = False
-        said_5 = False
-        said_6 = False
-        said_7 = False
-        said_8 = False
-        said_9 = False
-        
                
 # Run the bot. Put your own discord Token code in 'quotes'.
 
