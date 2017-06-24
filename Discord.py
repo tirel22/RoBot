@@ -107,39 +107,56 @@ class YoutubePlayer(GetInfo):
 
     """
     Return what to play next. The 'counter' parameter is the index
-    for the next song in queue. PS: The 'queue_dict' is a 2d list, 
+    for the next song in queue. PS: The 'queue_matrix' is a 2d list, 
     index[0] being the server-id, index[1] being the song-url.
-    queue_dict[0][1], for example, will contain the second server,
-    and queue_dict[1][1] will contain the specific song for that
+    queue_matrix[0][1], for example, will contain the second server,
+    and queue_matrix[1][1] will contain the specific song for that
     server. Not the best way, but at least it works. Ik, it 
     asks for trouble.
     """
     def check_playlist(self, counter):
-        initial_check = Playlist.queue_dict[0]
+        initial_check = Playlist.queue_matrix[0]
         try:
             check_server = ''.join(initial_check[counter])
         except:
             return False
         if int(check_server) == int(self.user_server_id):
-            check_song = Playlist.queue_dict[1]
+            check_song = Playlist.queue_matrix[1]
             song_to_play = ''.join(check_song[counter])
-            remove_current_song = Playlist.queue_dict[1].pop(counter)
-            remove_current_server = Playlist.queue_dict[0].pop(counter)
+            remove_current_song = Playlist.queue_matrix[1].pop(counter)
+            remove_current_server = Playlist.queue_matrix[0].pop(counter)
             return song_to_play
 
     
-    #Check all the servers with songs in queue and return the index.
+    #Check all the items in a list and return the index of the first duplicate
     
     def find_list_duplicates(self, lst):
         count = collections.Counter(lst)
         duplicates = [i for i in count]
-        server_index = {}
+        duplicate_index = {}
         for items in duplicates:
-            server_index[items] = [i for i, j in enumerate(lst)]
-            songs_in_server = server_index[self.user_server_id][0:]
+            duplicate_index[items] = [i for i, j in enumerate(lst)]
+            songs_in_server = duplicate_index[self.user_server_id][0:]
             print(songs_in_server)
-            remove_current_index = server_index[self.user_server_id].pop(0)
+            remove_current_index = duplicate_index[self.user_server_id].pop(0)
             return songs_in_server[0]
+
+    async def output_trakcs(self):
+        song_index_list = []
+        counter = 0
+        await client.send_message(self.message.channel, 'Melodii in playlist: ')
+        for tracks in Playlist.queue_matrix[1][0:]:
+            try:
+                server_queue = self.find_list_duplicates(Playlist.queue_matrix[0][counter:])
+                song_index_list.append(Playlist.queue_matrix[1][server_queue])
+                print('song-index {}'.format(song_index_list))
+                counter +=1
+                print('counter {}'.format(counter))
+            except:
+                break
+            await client.send_message(self.message.channel, '{}'.format(str(song_index_list)))
+            #counter = 0
+        #await client.send_message(self.message.channel,'Melodii in playlist: {}'.format(Playlist.queue_matrix[1][0:song_index]))
 
 
     #Finally, play some music, grab a beer and relax.
@@ -156,7 +173,7 @@ class YoutubePlayer(GetInfo):
             #If a song is in queue, play it.
             
             while True:
-                check_next_song = self.check_playlist(self.find_list_duplicates(Playlist.queue_dict[0]))
+                check_next_song = self.check_playlist(self.find_list_duplicates(Playlist.queue_matrix[0]))
                 if check_next_song != False:
                     voice = await self.create_voice_object()
                     # For whatever reason, create_youtube_player is not working here.
@@ -203,18 +220,18 @@ class YoutubeSearch:
             return
 
 class Playlist(YoutubePlayer):
-    queue_dict = [[] for x in range(2)]
+    """
+    I know waht you think...why not use a dictionary for this?
+    It just hurts to rewrite and delete that much code...that's all.
+    """
+    queue_matrix = [[] for x in range(2)]
 
     # The simplest playlist method that you have ever seen. Trust me.
     @classmethod
     def add_to_playlist(cls, server, song):
-        cls.queue_dict[0].append(server)
-        cls.queue_dict[1].append(song)
-        print(cls.queue_dict)
-
-    def output_trakcs(self):
-        server_to_search = self.find_list_duplicates(Playlist.queue_dict[0])
-        
+        cls.queue_matrix[0].append(server)
+        cls.queue_matrix[1].append(song)
+        print(cls.queue_matrix)
         
 
 class ForceExit(YoutubePlayer):
@@ -222,6 +239,7 @@ class ForceExit(YoutubePlayer):
         super().__init__(youtube_url, user_voice_ch_id, user_server_id, message)
 
     async def voice_force_exit(self):
+        # I'm sad. You didn't liked my personality, so I'm leaving
         while True:
             check_conn = await self.create_voice_object()
             if check_conn == False:
@@ -229,14 +247,14 @@ class ForceExit(YoutubePlayer):
                 get_voice_object = YoutubePlayer.voice_matrix[1][get_server_index]
                 await exit_voice_channel(1, get_voice_object)
                 try:
-                    find_server = self.find_list_duplicates(Playlist.queue_dict[0])
+                    find_server = self.find_list_duplicates(Playlist.queue_matrix[0])
                     tracks_found = True
                 except:
                     pass
                 while tracks_found:
                     try:
-                        force_remove_server = Playlist.queue_dict[0].pop(get_server_index)
-                        force_remove_track = Playlist.queue_dict[1].pop(get_server_index)
+                        force_remove_server = Playlist.queue_matrix[0].pop(get_server_index)
+                        force_remove_track = Playlist.queue_matrix[1].pop(get_server_index)
                     except:
                         break
                 self.remove_voice_object()
@@ -343,6 +361,9 @@ async def on_message(message):
 
     elif message.content.startswith('.jet'):
         await ForceExit(None, info.user_voice_ch_id, info.user_server_id, message).voice_force_exit()
+        pass
+    elif message.content.startswith('.playlist'):
+        await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).output_trakcs()
            
         
     elif message.content.startswith('.gluma'):
