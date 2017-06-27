@@ -53,8 +53,8 @@ class GetInfo:
 
 
 class YoutubePlayer(GetInfo):
-    voice_matrix = [[]for i in range(2)]
-    player_matrix = [[]for i in range(2)]
+    voice_dict = {}
+    player_dict = {}
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
         super().__init__(user_voice_ch_id, user_server_id, message)
@@ -63,8 +63,7 @@ class YoutubePlayer(GetInfo):
     async def create_voice_object(self, add_in_queue):
         try:
             self.voice = await client.join_voice_channel(self.channel)
-            pass_server = YoutubePlayer.voice_matrix[0].append(self.user_server_id)
-            pass_voice = YoutubePlayer.voice_matrix[1].append(self.voice)
+            pass_voice_object = YoutubePlayer.voice_dict[self.user_server_id] = self.voice
             return self.voice
         except: 
             if self.youtube_url != None and add_in_queue == True:
@@ -72,11 +71,6 @@ class YoutubePlayer(GetInfo):
                 await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
 
             return False
-
-    def remove_voice_object(self):
-        index_to_remove = self.find_list_duplicates(YoutubePlayer.voice_matrix[0], False)
-        remove_server = YoutubePlayer.voice_matrix[0].pop(index_to_remove)
-        remove_voice = YoutubePlayer.voice_matrix[1].pop(index_to_remove)
 
     async def create_youtube_player(self, voice, youtube_url, message):
         try:
@@ -89,8 +83,8 @@ class YoutubePlayer(GetInfo):
             return False
 
         song_time = int(player.duration)
-        pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
-        pass_player_object = YoutubePlayer.player_matrix[1].append(player)
+        pass_current_player_obj = YoutubePlayer.player_dict[self.user_server_id] = player
+        print('player: {}'.format(YoutubePlayer.player_dict[self.user_server_id]))
         return song_time
 
     """
@@ -101,26 +95,10 @@ class YoutubePlayer(GetInfo):
         remove_current_song = Playlist.queue_dict.get(self.user_server_id)
         if remove_current_song != None:
             remove_current_song.pop(0)
-            #TODO Destroy youtube player object
+            destroy_player = YoutubePlayer.player_dict[self.user_server_id].stop()
             if len(remove_current_song) == 0:
                 remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
         
-    
-    #Check all the items in a list and return the index of the first duplicate
-    
-    def find_list_duplicates(self, lst, return_all):
-        count = collections.Counter(lst)
-        duplicates = [i for i in count]
-        duplicate_index = {}
-        for items in duplicates:
-            duplicate_index[items] = [i for i, j in enumerate(lst)]
-            songs_in_server = duplicate_index[self.user_server_id][0:]
-            print(songs_in_server)
-            remove_current_index = duplicate_index[self.user_server_id].pop(0)
-            if return_all:
-                return songs_in_server
-            else:
-                return songs_in_server[0]
 
     async def output_trakcs(self):
         await client.send_message(self.message.channel, 'Melodii in playlist: ')
@@ -141,7 +119,6 @@ class YoutubePlayer(GetInfo):
                 await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
                 song_time = player
                 await exit_voice_channel(song_time, voice)
-                self.remove_voice_object()
                 self.destroy_youtube_player()
 
         else:
@@ -150,7 +127,7 @@ class YoutubePlayer(GetInfo):
 
               #If a song is in queue, play it.
             
-        while True:
+        while True: 
             check_next_song = Playlist.queue_dict.get(self.user_server_id, False)
             if check_next_song != False:
                 voice = await self.create_voice_object(False)
@@ -165,10 +142,8 @@ class YoutubePlayer(GetInfo):
                         await exit_voice_channel(1, voice)
                     break
                 song_time = int(player.duration)
-                pass_server = YoutubePlayer.player_matrix[0].append(self.user_server_id)
-                pass_player_object = YoutubePlayer.player_matrix[1].append(player)
+                pass_player_object = YoutubePlayer.player_dict[self.user_server_id] = player
                 await exit_voice_channel(song_time, voice)
-                self.remove_voice_object()
                 self.destroy_youtube_player()
             else:
                 return
@@ -214,13 +189,11 @@ class ForceExit(YoutubePlayer):
         while True:
             check_conn = await self.create_voice_object(False)
             if check_conn == False:
-                get_server_index = self.find_list_duplicates(self.voice_matrix[0], False)
-                get_voice_object = YoutubePlayer.voice_matrix[1][get_server_index]
+                get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
                 await exit_voice_channel(1, get_voice_object)
                 server_queue = Playlist.queue_dict.get(self.user_server_id)
                 if server_queue != None:
                     remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
-                self.remove_voice_object()
                 self.destroy_youtube_player()
                 break
             else:
@@ -324,7 +297,7 @@ async def on_message(message):
 
     elif message.content.startswith('.jet'):
         await ForceExit(None, info.user_voice_ch_id, info.user_server_id, message).voice_force_exit()
-        pass
+        
     elif message.content.startswith('.playlist'):
         await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).output_trakcs()
            
