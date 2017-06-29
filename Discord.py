@@ -62,9 +62,9 @@ class YoutubePlayer(GetInfo):
     # Create a voice object that is unique per server. Isn't that cool? 
     async def create_voice_object(self, add_in_queue):
         try:
-            self.voice = await client.join_voice_channel(self.channel)
-            pass_voice_object = YoutubePlayer.voice_dict[self.user_server_id] = self.voice
-            return self.voice
+            voice = await client.join_voice_channel(self.channel)
+            pass_voice_object = YoutubePlayer.voice_dict[self.user_server_id] = voice
+            return voice
         except: 
             if self.youtube_url != None and add_in_queue == True:
                 add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
@@ -119,6 +119,7 @@ class YoutubePlayer(GetInfo):
                 await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
                 song_time = player
                 await exit_voice_channel(song_time, voice)
+                await self.play_queued_song()
                 self.destroy_youtube_player()
 
         else:
@@ -127,8 +128,10 @@ class YoutubePlayer(GetInfo):
 
               #If a song is in queue, play it.
             
+    async def play_queued_song(self):
         while True: 
             check_next_song = Playlist.queue_dict.get(self.user_server_id, False)
+            print('check {}'.format(check_next_song))
             if check_next_song != False:
                 voice = await self.create_voice_object(False)
                 # For whatever reason, create_youtube_player is not working here.
@@ -170,7 +173,7 @@ class YoutubeSearch:
 class Playlist(YoutubePlayer):
     queue_dict = {}
 
-    # The simplest playlist method that you have ever seen. Trust me.
+
     @classmethod
     def add_to_playlist(cls, server, song):
         if cls.queue_dict.get(server) == None:
@@ -202,8 +205,6 @@ class ForceExit(YoutubePlayer):
                 break
         
             
-        
-# Function for playing any aduio file
 async def play_audio_file(audio_file, get_voice_channel_id, audio_duration):
     try:
         voice = await client.join_voice_channel(get_voice_channel_id)
@@ -219,7 +220,6 @@ async def exit_voice_channel(exit_time, voice_connection):
     await voice_connection.disconnect()
 
 
-#Function for generating a random number  
 def random_int_gen(input_number1, input_number2):
     output_rand = random.randrange(input_number1, input_number2)
     return output_rand
