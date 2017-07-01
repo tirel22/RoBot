@@ -119,7 +119,7 @@ class YoutubePlayer(GetInfo):
                 await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
                 song_time = player
                 await exit_voice_channel(song_time, voice)
-                await self.play_queued_song()
+                await self.play_queued_song(None)
                 self.destroy_youtube_player()
 
         else:
@@ -128,16 +128,22 @@ class YoutubePlayer(GetInfo):
 
               #If a song is in queue, play it.
             
-    async def play_queued_song(self):
-        while True: 
-            check_next_song = Playlist.queue_dict.get(self.user_server_id, False)
+    async def play_queued_song(self, skip_url):
+        while True:
+            if skip_url == None:
+                check_next_song = Playlist.queue_dict.get(self.user_server_id, False)
+            else:
+                check_next_song = skip_url
             print('check {}'.format(check_next_song))
             if check_next_song != False:
                 voice = await self.create_voice_object(False)
                 # For whatever reason, create_youtube_player is not working here.
                 # For now, I will repeat that code, untill I can figure this out.
                 try:
-                    player = await voice.create_ytdl_player(check_next_song[0])
+                    if skip_url == None:
+                        player = await voice.create_ytdl_player(check_next_song[0])
+                    else:
+                        player = await voice.create_ytdl_player(check_next_song)
                     player.start()
                 except:
                     if voice != False:
@@ -148,8 +154,18 @@ class YoutubePlayer(GetInfo):
                 pass_player_object = YoutubePlayer.player_dict[self.user_server_id] = player
                 await exit_voice_channel(song_time, voice)
                 self.destroy_youtube_player()
-            else:
-                return
+            break
+
+    async def skip_song(self):
+        server_queue = Playlist.queue_dict.get(self.user_server_id)
+        if server_queue != None and len(server_queue) >=1: 
+            await ForceExit(None, self.user_voice_ch_id, self.user_server_id, self.message).voice_force_exit(False)
+            song_to_remove = Playlist.queue_dict[self.user_server_id].pop(0)
+            await self.play_queued_song(song_to_remove)
+            return 
+
+        else:
+            await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist. Nu fi timid, adauga.')
 
 
 class YoutubeSearch:
@@ -187,7 +203,7 @@ class ForceExit(YoutubePlayer):
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         super().__init__(youtube_url, user_voice_ch_id, user_server_id, message)
 
-    async def voice_force_exit(self):
+    async def voice_force_exit(self, clear_queue):
         # I'm sad. You didn't liked my personality, so I'm leaving
         while True:
             check_conn = await self.create_voice_object(False)
@@ -195,9 +211,10 @@ class ForceExit(YoutubePlayer):
                 get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
                 await exit_voice_channel(1, get_voice_object)
                 server_queue = Playlist.queue_dict.get(self.user_server_id)
-                if server_queue != None:
-                    remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
-                self.destroy_youtube_player()
+                if clear_queue:
+                    if server_queue != None:
+                        remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
+                    self.destroy_youtube_player()
                 break
             else:
                 await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
@@ -296,7 +313,10 @@ async def on_message(message):
         await client.send_message(message.channel, 'RoBot v. {} Discord.py API v. {}'.format(version, discord.__version__))
 
     elif message.content.startswith('.jet'):
-        await ForceExit(None, info.user_voice_ch_id, info.user_server_id, message).voice_force_exit()
+        await ForceExit(None, info.user_voice_ch_id, info.user_server_id, message).voice_force_exit(True)
+
+    elif message.content.startswith('.sari'):
+        await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).skip_song()   
         
     elif message.content.startswith('.playlist'):
         await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).output_trakcs()
@@ -385,4 +405,4 @@ async def on_message(message):
                
 # Run the bot. Put your own discord Token code in 'quotes'.
 
-client.run('YOUR_TOKEN_HERE')
+client.run('YOUR_TEKON_HERE')
