@@ -101,7 +101,6 @@ class YoutubePlayer(GetInfo):
             destroy_player = YoutubePlayer.player_dict[self.user_server_id].stop()
             if len(remove_current_song) == 0:
                 remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
-            return pop_song
         
 
     async def output_trakcs(self):
@@ -122,9 +121,11 @@ class YoutubePlayer(GetInfo):
             if player != False:
                 await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
                 song_time = player
+                current_player = self.player_dict.get(self.user_server_id)
                 await exit_voice_channel(song_time, voice)
                 await self.play_queued_song(None)
-                self.destroy_youtube_player()
+                if self.player_dict.get(self.user_server_id) == current_player:
+                    self.destroy_youtube_player()
 
         else:
             await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
@@ -136,8 +137,10 @@ class YoutubePlayer(GetInfo):
         while True:
             if skip_url == None:
                 check_next_song = Playlist.queue_dict.get(self.user_server_id, False)
+                was_skipped = False
             else:
                 check_next_song = skip_url
+                was_skipped = True
             print('check {}'.format(check_next_song))
             if check_next_song != False:
                 voice = await self.create_voice_object(False)
@@ -153,23 +156,28 @@ class YoutubePlayer(GetInfo):
                     if voice != False:
                         await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
                         await ForceExit(None, self.user_server_id, self.user_server_id, self.message).voice_force_exit(False)
+                        self.destroy_youtube_player()
                     break
                 song_time = int(player.duration)
                 pass_player_object = YoutubePlayer.player_dict[self.user_server_id] = player
                 await exit_voice_channel(song_time, voice)
-                self.destroy_youtube_player()
+                if was_skipped:
+                    skip_url = None
+                else:
+                    self.destroy_youtube_player()
             else:
-                return
+                break
 
     async def skip_song(self):
         server_queue = Playlist.queue_dict.get(self.user_server_id)
         if server_queue != None and len(server_queue) >=1: 
             await ForceExit(None, self.user_voice_ch_id, self.user_server_id, self.message).voice_force_exit(False)
             song_to_remove = Playlist.queue_dict[self.user_server_id].pop(0)
-            await self.play_queued_song(song_to_remove) 
+            await self.play_queued_song(song_to_remove)
             
         else:
             await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist. Nu fi timid, adauga.')
+            return
 
 
 class YoutubeSearch:
