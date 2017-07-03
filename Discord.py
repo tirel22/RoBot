@@ -13,6 +13,7 @@ import urllib.parse
 import re
 from discord.ext import commands
 import collections
+import cleverbot
 
 version = 0.9
 
@@ -104,11 +105,11 @@ class YoutubePlayer(GetInfo):
         
 
     async def output_trakcs(self):
-        await client.send_message(self.message.channel, 'Melodii in playlist: ')
         server_tracks = Playlist.queue_dict.get(self.user_server_id)
         if server_tracks != None:
-            await client.send_message(self.message.channel, 'Total melodii: {}, URL: {}'.format(len(server_tracks), server_tracks))
-            
+            str_song = ', '.join(server_tracks)
+            await client.send_message(self.message.channel, 'Total melodii: {}, URL: {}'.format(len(server_tracks), str_song))
+    
         else:
             await client.send_message(self.message.channel, 'Total melodii: 0')
 
@@ -153,10 +154,18 @@ class YoutubePlayer(GetInfo):
                         player = await voice.create_ytdl_player(check_next_song)
                     player.start()
                 except:
-                    if voice != False:
+                    if voice != False and was_skipped == True:
                         await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
                         await ForceExit(None, self.user_server_id, self.user_server_id, self.message).voice_force_exit(False)
                         self.destroy_youtube_player()
+
+                    elif voice != False and was_skipped == False:
+                        await ForceExit(None, self.user_server_id, self.user_server_id, self.message).voice_force_exit(False)
+                        self.destroy_youtube_player()
+
+                    else:
+                        #TODO This is a problem. Log that.
+                        pass
                     break
                 song_time = int(player.duration)
                 pass_player_object = YoutubePlayer.player_dict[self.user_server_id] = player
@@ -178,6 +187,61 @@ class YoutubePlayer(GetInfo):
         else:
             await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist. Nu fi timid, adauga.')
             return
+    
+    async def remove_song(self, user_input):
+        if user_input.startswith('https://') and Playlist.queue_dict.get(self.user_server_id) != None:
+            counter = 0 
+            for tracks in Playlist.queue_dict[self.user_server_id]:
+                found_song = Playlist.queue_dict[self.user_server_id][counter]
+                if found_song == user_input:
+                    succes = Playlist.queue_dict[self.user_server_id].pop(counter)
+                    return succes
+                else:
+                    counter += 1
+
+        elif Playlist.queue_dict.get(self.user_server_id) == None:
+            await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist')
+            return False
+
+        else:
+            try:
+                index = int(user_input)
+                is_int = True
+            except:
+                is_int = False
+          
+            if is_int:
+                #The user did all the work for me. Just remove the index provided...
+                if Playlist.queue_dict.get(self.user_server_id) != None:
+                    number_of_songs = len(Playlist.queue_dict.get(self.user_server_id))
+                    if number_of_songs <= index and number_of_songs > 0:
+                        removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
+                        return removed_index
+
+                    else:
+                        await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist cu index-ul mentionat de tine')
+                        return False
+
+            elif not is_int:
+                #This is my time to shine. Time for some detective action
+                search_url = await YoutubeSearch(user_input, self.message).search_youtube_url()
+                counter = 0
+                if Playlist.queue_dict.get(self.user_server_id) != None:
+                    for tracks in Playlist.queue_dict[self.user_server_id]:
+                        search_in_queue = Playlist.queue_dict[self.user_server_id][counter]
+                        if search_url == search_in_queue:
+                            removed_index = Playlist.queue_dict[self.user_server_id].pop(counter)
+                            return removed_index
+                        else:
+                            counter += 1
+                    else:
+                       await client.send_message(self.message.channel, 'Nu am gasti nici o melodie in queue cu keyword-ul mentionat de tine. Verifica daca melodia chiar exista in playlsit, sau incearca din nou.') 
+                       return False
+
+        
+    async def pause_song(self):
+        pass
+                
 
 
 class YoutubeSearch:
@@ -190,9 +254,9 @@ class YoutubeSearch:
         try:
             # Modified code form Grant Curell, https://www.codeproject.com/Articles/873060/Python-Search-Youtube-for-Video. License: GPLv3.
             query_string = urllib.parse.urlencode({"search_query" : self.user_keyword})
-            html_content = urllib.request.urlopen("http://www.youtube.com/results?" + query_string)
+            html_content = urllib.request.urlopen("https://www.youtube.com/results?" + query_string)
             search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
-            return ("http://www.youtube.com/watch?v=" + search_results[0])
+            return ("https://www.youtube.com/watch?v=" + search_results[0])
         # End of copyright
         except:
             await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
@@ -330,6 +394,15 @@ async def on_message(message):
         
     elif message.content.startswith('.playlist'):
         await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).output_trakcs()
+
+    elif message.content.startswith('.sterge'):
+        usr_input = message.content.replace('.sterge', '').strip()
+        if usr_input != '':
+            remove = await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).remove_song(usr_input)
+            if remove != False:
+                await client.send_message(info.message.channel, 'Am sters: {}'.format(remove)) 
+        else:
+            await client.send_message(info.message.channel, 'Te rog sa imi spui ce vrei sa sterg.')
            
         
     elif message.content.startswith('.gluma'):
