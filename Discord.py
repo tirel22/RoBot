@@ -3,6 +3,29 @@
 """ This bot is written for romanian users, but the comments are in english. 
     Also, this is my first python project, so the code isn't "ideal" """
 
+""" This bot is designed to be hosted on a Linux based OS, if you want to 
+    make it work under Windows you need te make a few tweaks. 
+    Feel free to make pull requests if you want to make this "Frankensteined" bot
+    better.    
+"""
+
+"""
+MIT Licence:
+Copyright 2017 Tirel Antony
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal 
+in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+DEALINGS IN THE SOFTWARE.
+
+"""
+
 import random
 import math
 import os
@@ -13,7 +36,6 @@ import urllib.parse
 import re
 from discord.ext import commands
 import collections
-import cleverbot
 
 version = 0.9
 
@@ -56,6 +78,7 @@ class GetInfo:
 class YoutubePlayer(GetInfo):
     voice_dict = {}
     player_dict = {}
+    paused_state = {}
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
         super().__init__(user_voice_ch_id, user_server_id, message)
@@ -240,7 +263,18 @@ class YoutubePlayer(GetInfo):
 
         
     async def pause_song(self):
-        pass
+        get_player = self.player_dict.get(self.user_server_id)
+        if get_player != None and self.paused_state.get(self.user_server_id) == None:
+            get_player.pause()
+            self.paused_state[self.user_server_id] = True
+
+        elif get_player != None and self.paused_state.get(self.user_server_id) != None:
+            self.paused_state.pop(self.user_server_id)
+            get_player.resume()
+
+        else:
+            await client.send_message(self.message.channel, 'Sunt pe stop, daca vrei sa fiu pe pauza trebuie sa pui o melodie.')
+            return
                 
 
 
@@ -269,9 +303,9 @@ class Playlist(YoutubePlayer):
     @classmethod
     def add_to_playlist(cls, server, song):
         if cls.queue_dict.get(server) == None:
-            key_to_dict_list = cls.queue_dict[server] = [song]
+            cls.queue_dict[server] = [song]
         else:
-            queue_dict_list = cls.queue_dict[server].append(song)
+            cls.queue_dict[server].append(song)
         print('Dict {}'.format(cls.queue_dict))
         
 
@@ -403,6 +437,9 @@ async def on_message(message):
                 await client.send_message(info.message.channel, 'Am sters: {}'.format(remove)) 
         else:
             await client.send_message(info.message.channel, 'Te rog sa imi spui ce vrei sa sterg.')
+
+    elif message.content.startswith('.pauza'):
+        await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).pause_song()
            
         
     elif message.content.startswith('.gluma'):
