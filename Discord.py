@@ -79,6 +79,7 @@ class YoutubePlayer(GetInfo):
     voice_dict = {}
     player_dict = {}
     paused_state = {}
+    user_votes = {}
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
         super().__init__(user_voice_ch_id, user_server_id, message)
@@ -202,7 +203,7 @@ class YoutubePlayer(GetInfo):
 
     async def skip_song(self):
         server_queue = Playlist.queue_dict.get(self.user_server_id)
-        if server_queue != None and len(server_queue) >=1: 
+        if server_queue != None and len(server_queue) >=1 and await self.democracy(self.message): 
             await ForceExit(None, self.user_voice_ch_id, self.user_server_id, self.message).voice_force_exit(False)
             song_to_remove = Playlist.queue_dict[self.user_server_id].pop(0)
             await self.play_queued_song(song_to_remove)
@@ -212,7 +213,7 @@ class YoutubePlayer(GetInfo):
             return
     
     async def remove_song(self, user_input):
-        if user_input.startswith('https://') and Playlist.queue_dict.get(self.user_server_id) != None:
+        if user_input.startswith('https://') and Playlist.queue_dict.get(self.user_server_id) != None and await self.democracy(self.message):
             counter = 0 
             for tracks in Playlist.queue_dict[self.user_server_id]:
                 found_song = Playlist.queue_dict[self.user_server_id][counter]
@@ -271,11 +272,36 @@ class YoutubePlayer(GetInfo):
         elif get_player != None and self.paused_state.get(self.user_server_id) != None:
             self.paused_state.pop(self.user_server_id)
             get_player.resume()
-
+            
         else:
             await client.send_message(self.message.channel, 'Sunt pe stop, daca vrei sa fiu pe pauza trebuie sa pui o melodie.')
             return
-                
+
+    # Simple vote method for voice related administrative tasks.
+    async def democracy(self, message):
+        # Remove junk if needed
+        if self.user_votes.get(self.user_server_id):
+            self.user_votes.pop(self.user_server_id)
+        voice_members = len(self.channel.voice_members)
+        if voice_members:
+            if voice_members <= 2:
+                return True
+            else:
+                votes_req = voice_members // 2
+                await client.send_message(self.message.channel, 'Voturi necesare: {} , ".vot" pentru a vota. 40 de secunde ramase...'.format(votes_req))
+                x = 0
+                while x < 20:
+                    if self.user_votes.get(self.user_server_id) != None:
+                        if len(self.user_votes[self.user_server_id]) == votes_req:
+                            return True
+                    x +=1
+                    await asyncio.sleep(2)
+                else:
+                    await client.send_message(self.message.channel, 'Tic-tac, n-ati votat.')
+                    if self.user_votes.get(self.user_server_id) != None:
+                        self.user_votes.pop(self.user_server_id)
+                    return False
+
 
 
 class YoutubeSearch:
@@ -317,13 +343,14 @@ class ForceExit(YoutubePlayer):
         # I'm sad. You didn't liked my personality, so I'm leaving
         check_conn = await self.create_voice_object(False)
         if check_conn == False:
-            get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
-            await exit_voice_channel(1, get_voice_object)
-            server_queue = Playlist.queue_dict.get(self.user_server_id)
-            if clear_queue:
-                if server_queue != None:
-                    remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
-                self.destroy_youtube_player()
+            if await self.democracy(self.message):
+                get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
+                await exit_voice_channel(1, get_voice_object)
+                server_queue = Playlist.queue_dict.get(self.user_server_id)
+                if clear_queue:
+                    if server_queue != None:
+                        remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
+                    self.destroy_youtube_player()
         else:
             await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
             await exit_voice_channel(1, check_conn)
@@ -385,13 +412,36 @@ async def on_message(message):
     try:
         info = GetInfo(message.author.voice_channel.id, message.author.server.id, message)
     except AttributeError:
-        return
+        pass
 
     if message.content.startswith('.test'):
         test = await client.send_message(message.channel, "Da, functionez!")
         
-    elif message.content.startswith('.debug'):  
-        print(message.channel)
+    elif message.content.startswith('.debug'):
+        pass
+
+    elif message.content.startswith('.vot'):
+        
+        context = YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message)
+        if not context.user_votes.get(info.user_server_id) and context.voice_dict.get(info.user_server_id):
+            context.user_votes[info.user_server_id] = [message.author]
+        elif context.user_votes.get(info.user_server_id) and context.voice_dict.get(info.user_server_id):
+            counter = 0
+            for votes in context.user_votes[info.user_server_id]:
+                if context.user_votes[info.user_server_id][counter] == message.author:
+                    await client.send_message(info.message.channel, 'Ai votat deja.')
+                    return
+                else:
+                    counter += 1
+            else:
+                context.user_votes[info.user_server_id].append(message.author)
+        
+        else:
+            await client.send_message(info.message.channel, 'Esti cetatean European si ai drepturi, dar acum n-ai ce sa votezi.')
+
+    elif message.content.startswith('.democratie'):
+        await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).democracy(info.message)
+
 
     elif message.content.startswith('.amuzant'):
         start_playing_file = await play_audio_file('amuzant.mp3', info.channel, 5)
