@@ -91,9 +91,9 @@ class YoutubePlayer(GetInfo):
             pass_voice_object = YoutubePlayer.voice_dict[self.user_server_id] = voice
             return voice
         except: 
-            if self.youtube_url != None and add_in_queue == True:
+            if self.youtube_url and add_in_queue:
                 add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
-                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+                await client.send_message(self.message.channel, 'Sigur, adaug in playlist {}'.format(self.youtube_url))
 
             return False
 
@@ -102,7 +102,7 @@ class YoutubePlayer(GetInfo):
             player = await voice.create_ytdl_player(youtube_url)
             player.start()
         except:
-            if voice != False:
+            if voice:
                 await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
                 await exit_voice_channel(1, voice)
             return False
@@ -118,7 +118,7 @@ class YoutubePlayer(GetInfo):
     """
     def destroy_youtube_player(self):
         remove_current_song = Playlist.queue_dict.get(self.user_server_id)
-        if remove_current_song != None:
+        if remove_current_song:
             try:
                 pop_song = remove_current_song.pop(0)
             except IndexError:
@@ -130,7 +130,7 @@ class YoutubePlayer(GetInfo):
 
     async def output_trakcs(self):
         server_tracks = Playlist.queue_dict.get(self.user_server_id)
-        if server_tracks != None:
+        if server_tracks:
             str_song = ', '.join(server_tracks)
             await client.send_message(self.message.channel, 'Total melodii: {}, URL: {}'.format(len(server_tracks), str_song))
     
@@ -140,34 +140,35 @@ class YoutubePlayer(GetInfo):
 
     #Finally, play some music, grab a beer and relax.
     async def play_youtube_url(self):
-        if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
-            voice = await self.create_voice_object(True)
-            player = await self.create_youtube_player(voice, self.youtube_url, self.message)
-            if player != False:
-                await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
-                song_time = player
-                current_player = self.player_dict.get(self.user_server_id)
-                await exit_voice_channel(song_time, voice)
-                await self.play_queued_song(None)
-                if self.player_dict.get(self.user_server_id) == current_player:
-                    self.destroy_youtube_player()
+        if self.youtube_url:
+            if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
+                voice = await self.create_voice_object(True)
+                player = await self.create_youtube_player(voice, self.youtube_url, self.message)
+                if player != False:
+                    await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+                    song_time = player
+                    current_player = self.player_dict.get(self.user_server_id)
+                    await exit_voice_channel(song_time, voice)
+                    await self.play_queued_song(None)
+                    if self.player_dict.get(self.user_server_id) == current_player:
+                        self.destroy_youtube_player()
 
-        else:
-            await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
-            return 
+            else:
+                await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
+                return 
 
               #If a song is in queue, play it.
             
     async def play_queued_song(self, skip_url):
         while True:
-            if skip_url == None:
+            if not skip_url:
                 check_next_song = Playlist.queue_dict.get(self.user_server_id, False)
                 was_skipped = False
             else:
                 check_next_song = skip_url
                 was_skipped = True
             print('check {}'.format(check_next_song))
-            if check_next_song != False:
+            if check_next_song:
                 voice = await self.create_voice_object(False)
                 # For whatever reason, create_youtube_player is not working here.
                 # For now, I will repeat that code, untill I can figure this out.
@@ -178,12 +179,12 @@ class YoutubePlayer(GetInfo):
                         player = await voice.create_ytdl_player(check_next_song)
                     player.start()
                 except:
-                    if voice != False and was_skipped == True:
+                    if voice and was_skipped:
                         await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
                         await ForceExit(None, self.user_server_id, self.user_server_id, self.message).voice_force_exit(False)
                         self.destroy_youtube_player()
 
-                    elif voice != False and was_skipped == False:
+                    elif voice and not was_skipped:
                         await ForceExit(None, self.user_server_id, self.user_server_id, self.message).voice_force_exit(False)
                         self.destroy_youtube_player()
 
@@ -203,7 +204,7 @@ class YoutubePlayer(GetInfo):
 
     async def skip_song(self):
         server_queue = Playlist.queue_dict.get(self.user_server_id)
-        if server_queue != None and len(server_queue) >=1 and await self.democracy(self.message): 
+        if server_queue and len(server_queue) >=1 and await self.democracy(self.message): 
             await ForceExit(None, self.user_voice_ch_id, self.user_server_id, self.message).voice_force_exit(False)
             song_to_remove = Playlist.queue_dict[self.user_server_id].pop(0)
             await self.play_queued_song(song_to_remove)
@@ -213,7 +214,7 @@ class YoutubePlayer(GetInfo):
             return
     
     async def remove_song(self, user_input):
-        if user_input.startswith('https://') and Playlist.queue_dict.get(self.user_server_id) != None and await self.democracy(self.message):
+        if user_input.startswith('https://') and Playlist.queue_dict.get(self.user_server_id) and await self.democracy(self.message):
             counter = 0 
             for tracks in Playlist.queue_dict[self.user_server_id]:
                 found_song = Playlist.queue_dict[self.user_server_id][counter]
@@ -223,7 +224,7 @@ class YoutubePlayer(GetInfo):
                 else:
                     counter += 1
 
-        elif Playlist.queue_dict.get(self.user_server_id) == None:
+        elif not Playlist.queue_dict.get(self.user_server_id):
             await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist')
             return False
 
@@ -265,11 +266,11 @@ class YoutubePlayer(GetInfo):
         
     async def pause_song(self):
         get_player = self.player_dict.get(self.user_server_id)
-        if get_player != None and self.paused_state.get(self.user_server_id) == None:
+        if get_player and not self.paused_state.get(self.user_server_id):
             get_player.pause()
             self.paused_state[self.user_server_id] = True
 
-        elif get_player != None and self.paused_state.get(self.user_server_id) != None:
+        elif get_player and self.paused_state.get(self.user_server_id):
             self.paused_state.pop(self.user_server_id)
             get_player.resume()
             
@@ -284,21 +285,24 @@ class YoutubePlayer(GetInfo):
             self.user_votes.pop(self.user_server_id)
         voice_members = len(self.channel.voice_members)
         if voice_members:
-            if voice_members <= 2:
+            if voice_members <= 2: 
+                """The bot is already connected to the voice channel,
+                so there sould be just one more member left. In this case,
+                there is no need for wasting processing power."""
                 return True
             else:
-                votes_req = voice_members // 2
+                votes_req = voice_members // 2 # ~ 33% of the members, because it's floor division.
                 await client.send_message(self.message.channel, 'Voturi necesare: {} , ".vot" pentru a vota. 40 de secunde ramase...'.format(votes_req))
                 x = 0
-                while x < 20:
-                    if self.user_votes.get(self.user_server_id) != None:
+                while x < 20: # ~ 40 sec vote time.
+                    if self.user_votes.get(self.user_server_id):
                         if len(self.user_votes[self.user_server_id]) == votes_req:
                             return True
                     x +=1
                     await asyncio.sleep(2)
                 else:
                     await client.send_message(self.message.channel, 'Tic-tac, n-ati votat.')
-                    if self.user_votes.get(self.user_server_id) != None:
+                    if self.user_votes.get(self.user_server_id):
                         self.user_votes.pop(self.user_server_id)
                     return False
 
@@ -319,7 +323,7 @@ class YoutubeSearch:
             return ("https://www.youtube.com/watch?v=" + search_results[0])
         # End of copyright
         except:
-            await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele [" ' + self.user_keyword + ' "]')
+            await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele "{}"'.format(self.user_keyword))
             return
 
 class Playlist(YoutubePlayer):
@@ -328,11 +332,10 @@ class Playlist(YoutubePlayer):
 
     @classmethod
     def add_to_playlist(cls, server, song):
-        if cls.queue_dict.get(server) == None:
+        if not cls.queue_dict.get(server):
             cls.queue_dict[server] = [song]
         else:
             cls.queue_dict[server].append(song)
-        print('Dict {}'.format(cls.queue_dict))
         
 
 class ForceExit(YoutubePlayer):
@@ -342,13 +345,13 @@ class ForceExit(YoutubePlayer):
     async def voice_force_exit(self, clear_queue):
         # I'm sad. You didn't liked my personality, so I'm leaving
         check_conn = await self.create_voice_object(False)
-        if check_conn == False:
+        if not check_conn:
             if await self.democracy(self.message):
                 get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
                 await exit_voice_channel(1, get_voice_object)
                 server_queue = Playlist.queue_dict.get(self.user_server_id)
                 if clear_queue:
-                    if server_queue != None:
+                    if server_queue:
                         remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
                     self.destroy_youtube_player()
         else:
@@ -427,7 +430,7 @@ async def on_message(message):
             context.user_votes[info.user_server_id] = [message.author]
         elif context.user_votes.get(info.user_server_id) and context.voice_dict.get(info.user_server_id):
             counter = 0
-            for votes in context.user_votes[info.user_server_id]:
+            for votes in context.user_votes[info.user_server_id]: # Checks if the vote is duplicate
                 if context.user_votes[info.user_server_id][counter] == message.author:
                     await client.send_message(info.message.channel, 'Ai votat deja.')
                     return
@@ -439,18 +442,14 @@ async def on_message(message):
         else:
             await client.send_message(info.message.channel, 'Esti cetatean European si ai drepturi, dar acum n-ai ce sa votezi.')
 
-    elif message.content.startswith('.democratie'):
-        await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).democracy(info.message)
-
-
     elif message.content.startswith('.amuzant'):
         start_playing_file = await play_audio_file('amuzant.mp3', info.channel, 5)
-        if start_playing_file == False:
+        if not start_playing_file:
             await client.send_message(message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
 
     elif message.content.startswith('.taie'):
         start_playing_file = await play_audio_file('taie.mp3', info.channel, 3)
-        if start_playing_file == False:
+        if not start_playing_file:
             await client.send_message(message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
 
     elif message.content.startswith('.muzica'):
@@ -483,7 +482,7 @@ async def on_message(message):
         usr_input = message.content.replace('.sterge', '').strip()
         if usr_input != '':
             remove = await YoutubePlayer(None, info.user_voice_ch_id, info.user_server_id, message).remove_song(usr_input)
-            if remove != False:
+            if remove:
                 await client.send_message(info.message.channel, 'Am sters: {}'.format(remove)) 
         else:
             await client.send_message(info.message.channel, 'Te rog sa imi spui ce vrei sa sterg.')
