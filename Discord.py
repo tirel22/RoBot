@@ -293,11 +293,16 @@ class YoutubePlayer(GetInfo):
             else:
                 votes_req = voice_members // 2 # ~ 33% of the members, because it's floor division.
                 await client.send_message(self.message.channel, 'Voturi necesare: {} , ".vot" pentru a vota. 40 de secunde ramase...'.format(votes_req))
+                state = self.user_votes.get(self.user_server_id)
                 x = 0
                 while x < 20: # ~ 40 sec vote time.
                     if self.user_votes.get(self.user_server_id):
                         if len(self.user_votes[self.user_server_id]) == votes_req:
                             return True
+                        else:
+                            if state != self.user_votes.get(self.user_server_id): # In a user has voted send feedback to the text channel.
+                                state = self.user_votes.get(self.user_server_id)
+                                await client.send_message(self.message.channel, 'Voturi: {} / {} , ".vot" pentru a vota. {} de secunde ramase...'.format(len(state), votes_req, 40-x*2))
                     x +=1
                     await asyncio.sleep(2)
                 else:
@@ -458,7 +463,7 @@ async def on_message(message):
         if output_url.startswith('-s'):
             final_user_keyword = output_url.replace('-s', '').strip()
 
-            await client.send_message(message.channel, 'Caut pe YouTube [" ' + final_user_keyword + ' "]')
+            await client.send_message(message.channel, 'Caut pe YouTube: "{}"'.format(final_user_keyword))
 
             returned_youtube_url = await YoutubeSearch(final_user_keyword, message).search_youtube_url()
             start_youtube_player = await YoutubePlayer(returned_youtube_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url()   
