@@ -181,7 +181,7 @@ class YoutubePlayer(GetInfo):
                 except:
                     if voice and was_skipped:
                         await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
-                        await ForceExit(None, self.user_server_id, self.user_server_id, self.message).voice_force_exit(False)
+                        await ForceExit(None, self.user_voice_ch_id, self.user_server_id, self.message).voice_force_exit(False)
                         self.destroy_youtube_player()
 
                     elif voice and not was_skipped:
