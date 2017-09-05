@@ -88,11 +88,11 @@ class YoutubePlayer(GetInfo):
     async def create_voice_object(self, add_in_queue):
         try:
             voice = await client.join_voice_channel(self.channel)
-            pass_voice_object = YoutubePlayer.voice_dict[self.user_server_id] = voice
+            YoutubePlayer.voice_dict[self.user_server_id] = voice
             return voice
         except: 
             if self.youtube_url and add_in_queue:
-                add_to_playlist = Playlist.add_to_playlist(self.user_server_id, self.youtube_url)
+                Playlist.add_to_playlist(self.user_server_id, self.youtube_url, self.message)
                 await client.send_message(self.message.channel, 'Sigur, adaug in playlist {}'.format(self.youtube_url))
 
             return False
@@ -108,7 +108,7 @@ class YoutubePlayer(GetInfo):
             return False
 
         song_time = int(player.duration)
-        pass_current_player_obj = YoutubePlayer.player_dict[self.user_server_id] = player
+        YoutubePlayer.player_dict[self.user_server_id] = player
         print('player: {}'.format(YoutubePlayer.player_dict[self.user_server_id]))
         return song_time
 
@@ -117,15 +117,19 @@ class YoutubePlayer(GetInfo):
     compute power level less than 9000
     """
     def destroy_youtube_player(self):
-        remove_current_song = Playlist.queue_dict.get(self.user_server_id)
-        if remove_current_song:
+        current_song = Playlist.queue_dict.get(self.user_server_id)
+        current_owner = Playlist.owner_dict.get(self.user_server_id)
+        if current_song and current_owner:
             try:
-                pop_song = remove_current_song.pop(0)
+                current_song.pop(0)
+                current_owner.pop(0)
             except IndexError:
                 pass
-            destroy_player = YoutubePlayer.player_dict[self.user_server_id].stop()
-            if len(remove_current_song) == 0:
-                remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
+            YoutubePlayer.player_dict[self.user_server_id].stop()
+            if len(current_song) == 0:
+                Playlist.queue_dict.pop(self.user_server_id)
+                Playlist.owner_dict.pop(self.user_server_id)
+
         
 
     async def output_trakcs(self):
@@ -204,22 +208,26 @@ class YoutubePlayer(GetInfo):
 
     async def skip_song(self):
         server_queue = Playlist.queue_dict.get(self.user_server_id)
-        if server_queue and len(server_queue) >=1 and await self.democracy(self.message): 
-            await ForceExit(None, self.user_voice_ch_id, self.user_server_id, self.message).voice_force_exit(False)
-            song_to_remove = Playlist.queue_dict[self.user_server_id].pop(0)
-            await self.play_queued_song(song_to_remove)
+        owner_queue = Playlist.owner_dict.get(self.user_server_id)
+        if server_queue and owner_queue and len(server_queue) >=1:
+            if await self.democracy(self.message, True): 
+                await ForceExit(None, self.user_voice_ch_id, self.user_server_id, self.message).voice_force_exit(False)
+                song_to_remove = server_queue.pop(0)
+                owner_queue.pop(0)
+                await self.play_queued_song(song_to_remove)
             
         else:
             await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist. Nu fi timid, adauga.')
             return
     
     async def remove_song(self, user_input):
-        if user_input.startswith('https://') and Playlist.queue_dict.get(self.user_server_id) and await self.democracy(self.message):
+        if user_input.startswith('https://') and Playlist.queue_dict.get(self.user_server_id) and await self.democracy(self.message, True):
             counter = 0 
             for tracks in Playlist.queue_dict[self.user_server_id]:
                 found_song = Playlist.queue_dict[self.user_server_id][counter]
                 if found_song == user_input:
                     succes = Playlist.queue_dict[self.user_server_id].pop(counter)
+                    Playlist.owner_dict[self.user_server_id].pop(counter)
                     return succes
                 else:
                     counter += 1
@@ -237,10 +245,11 @@ class YoutubePlayer(GetInfo):
           
             if is_int:
                 #The user did all the work for me. Just remove the index provided...
-                if Playlist.queue_dict.get(self.user_server_id) != None:
+                if Playlist.queue_dict.get(self.user_server_id):
                     number_of_songs = len(Playlist.queue_dict.get(self.user_server_id))
                     if number_of_songs <= index and number_of_songs > 0:
                         removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
+                        Playlist.owner_dict[self.user_server_id].pop(index - 1)
                         return removed_index
 
                     else:
@@ -251,11 +260,12 @@ class YoutubePlayer(GetInfo):
                 #This is my time to shine. Time for some detective action
                 search_url = await YoutubeSearch(user_input, self.message).search_youtube_url()
                 counter = 0
-                if Playlist.queue_dict.get(self.user_server_id) != None:
+                if Playlist.queue_dict.get(self.user_server_id):
                     for tracks in Playlist.queue_dict[self.user_server_id]:
                         search_in_queue = Playlist.queue_dict[self.user_server_id][counter]
                         if search_url == search_in_queue:
                             removed_index = Playlist.queue_dict[self.user_server_id].pop(counter)
+                            Playlist.owner_dict[self.user_server_id].pop(counter)
                             return removed_index
                         else:
                             counter += 1
@@ -279,7 +289,7 @@ class YoutubePlayer(GetInfo):
             return
 
     # Simple vote method for voice related administrative tasks.
-    async def democracy(self, message):
+    async def democracy(self, message, owner_dependent):
         # Remove junk if needed
         if self.user_votes.get(self.user_server_id):
             self.user_votes.pop(self.user_server_id)
@@ -290,26 +300,32 @@ class YoutubePlayer(GetInfo):
                 so there sould be just one more member left. In this case,
                 there is no need for wasting processing power."""
                 return True
+
+            elif owner_dependent and Playlist.owner_dict.get(self.user_server_id):
+                if Playlist.owner_dict[self.user_server_id][0] == message.author:
+                    # He/She is the DJ. Unlimited power is needed.
+                    print('owner')
+                    return True
+                
+            votes_req = voice_members // 2 # ~ 33% of the members, because it's floor division.
+            await client.send_message(self.message.channel, 'Voturi necesare: {} , ".vot" pentru a vota. 60 de secunde ramase...'.format(votes_req))
+            state = self.user_votes.get(self.user_server_id)
+            x = 0
+            while x < 30: # ~ 60 sec vote time.
+                if self.user_votes.get(self.user_server_id):
+                    if len(self.user_votes[self.user_server_id]) == votes_req:
+                        return True
+                    else:
+                        if state != self.user_votes.get(self.user_server_id): # If a user has voted send feedback to the text channel.
+                            state = self.user_votes.get(self.user_server_id)
+                            await client.send_message(self.message.channel, 'Voturi: {} / {} , ".vot" pentru a vota. {} de secunde ramase...'.format(len(state), votes_req, 60-x*2))
+                x +=1
+                await asyncio.sleep(2)
             else:
-                votes_req = voice_members // 2 # ~ 33% of the members, because it's floor division.
-                await client.send_message(self.message.channel, 'Voturi necesare: {} , ".vot" pentru a vota. 40 de secunde ramase...'.format(votes_req))
-                state = self.user_votes.get(self.user_server_id)
-                x = 0
-                while x < 20: # ~ 40 sec vote time.
-                    if self.user_votes.get(self.user_server_id):
-                        if len(self.user_votes[self.user_server_id]) == votes_req:
-                            return True
-                        else:
-                            if state != self.user_votes.get(self.user_server_id): # In a user has voted send feedback to the text channel.
-                                state = self.user_votes.get(self.user_server_id)
-                                await client.send_message(self.message.channel, 'Voturi: {} / {} , ".vot" pentru a vota. {} de secunde ramase...'.format(len(state), votes_req, 40-x*2))
-                    x +=1
-                    await asyncio.sleep(2)
-                else:
-                    await client.send_message(self.message.channel, 'Tic-tac, n-ati votat.')
-                    if self.user_votes.get(self.user_server_id):
-                        self.user_votes.pop(self.user_server_id)
-                    return False
+                await client.send_message(self.message.channel, 'Tic-tac, n-ati votat.')
+                if self.user_votes.get(self.user_server_id):
+                    self.user_votes.pop(self.user_server_id)
+                return False
 
 
 
@@ -333,14 +349,17 @@ class YoutubeSearch:
 
 class Playlist(YoutubePlayer):
     queue_dict = {}
-
+    owner_dict = {}
 
     @classmethod
-    def add_to_playlist(cls, server, song):
+    def add_to_playlist(cls, server, song, message):
         if not cls.queue_dict.get(server):
             cls.queue_dict[server] = [song]
+            cls.owner_dict[server] = [message.author]
+            print('d {}'.format(message.author))
         else:
             cls.queue_dict[server].append(song)
+            cls.owner_dict[server].append(message.author)
         
 
 class ForceExit(YoutubePlayer):
@@ -351,13 +370,14 @@ class ForceExit(YoutubePlayer):
         # I'm sad. You didn't liked my personality, so I'm leaving
         check_conn = await self.create_voice_object(False)
         if not check_conn:
-            if await self.democracy(self.message):
+            if await self.democracy(self.message, True):
                 get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
                 await exit_voice_channel(1, get_voice_object)
                 server_queue = Playlist.queue_dict.get(self.user_server_id)
                 if clear_queue:
                     if server_queue:
-                        remove_server_key = Playlist.queue_dict.pop(self.user_server_id)
+                        Playlist.queue_dict.pop(self.user_server_id)
+                        Playlist.owner_dict.pop(self.user_server_id)
                     self.destroy_youtube_player()
         else:
             await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
