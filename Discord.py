@@ -80,6 +80,7 @@ class YoutubePlayer(GetInfo):
     player_dict = {}
     paused_state = {}
     user_votes = {}
+    non_queue_owner = {}
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
         super().__init__(user_voice_ch_id, user_server_id, message)
@@ -89,6 +90,7 @@ class YoutubePlayer(GetInfo):
         try:
             voice = await client.join_voice_channel(self.channel)
             YoutubePlayer.voice_dict[self.user_server_id] = voice
+            self.non_queue_owner[self.user_server_id] = self.message.author
             return voice
         except: 
             if self.youtube_url and add_in_queue:
@@ -145,11 +147,11 @@ class YoutubePlayer(GetInfo):
     #Finally, play some music, grab a beer and relax.
     async def play_youtube_url(self):
         if self.youtube_url:
-            if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/'):
+            if self.youtube_url.startswith('https://www.youtube.com/watch?v=') or self.youtube_url.startswith('http://www.youtube.com/watch?v=') or self.youtube_url.startswith('https://youtu.be/') or self.youtube_url.startswith('http://youtu.be/'):
                 voice = await self.create_voice_object(True)
                 player = await self.create_youtube_player(voice, self.youtube_url, self.message)
                 if player != False:
-                    await client.send_message(self.message.channel, 'Sigur, adaug in playlist ' + self.youtube_url)
+                    await client.send_message(self.message.channel, 'Sigur, adaug in playlist {}'.format(self.youtube_url))
                     song_time = player
                     current_player = self.player_dict.get(self.user_server_id)
                     await exit_voice_channel(song_time, voice)
@@ -289,7 +291,7 @@ class YoutubePlayer(GetInfo):
             return
 
     # Simple vote method for voice related administrative tasks.
-    async def democracy(self, message, owner_dependent):
+    async def democracy(self, message, scan_once):
         # Remove junk if needed
         if self.user_votes.get(self.user_server_id):
             self.user_votes.pop(self.user_server_id)
@@ -301,11 +303,34 @@ class YoutubePlayer(GetInfo):
                 there is no need for wasting processing power."""
                 return True
 
-            elif owner_dependent and Playlist.owner_dict.get(self.user_server_id):
+            elif scan_once and Playlist.owner_dict.get(self.user_server_id):
                 if Playlist.owner_dict[self.user_server_id][0] == message.author:
                     # He/She is the DJ. Unlimited power is needed.
                     print('owner')
                     return True
+
+            elif not scan_once: # That means we need to leave forever, not just skip a song. Sad, isn't it?
+                counter = 0
+                same_owner = 0
+                if Playlist.owner_dict.get(self.user_server_id):
+                    for owners in Playlist.owner_dict.get(self.user_server_id):
+                        if Playlist.owner_dict.get(self.user_server_id)[counter] == message.author:
+                            same_owner +=1
+                            counter +=1
+                        else:
+                            await client.send_message(self.message.channel, 'Imi pare rau, dar nu ai drept asupra tuturor melodiilor din playlist. Traim intr-o tara democratica.')
+                            await self.democracy(message, True)
+                            
+
+                    if len(Playlist.owner_dict.get(self.user_server_id)) == same_owner:
+                        return True
+                else: # This means that the current playing song is the only one in queue.
+                    if self.non_queue_owner.get(self.user_server_id) == message.author:
+                        return True
+                    else:
+                        await self.democracy(message, True)
+                        
+
                 
             votes_req = voice_members // 2 # ~ 33% of the members, because it's floor division.
             await client.send_message(self.message.channel, 'Voturi necesare: {} , ".vot" pentru a vota. 60 de secunde ramase...'.format(votes_req))
@@ -370,7 +395,7 @@ class ForceExit(YoutubePlayer):
         # I'm sad. You didn't liked my personality, so I'm leaving
         check_conn = await self.create_voice_object(False)
         if not check_conn:
-            if await self.democracy(self.message, True):
+            if await self.democracy(self.message, False):
                 get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
                 await exit_voice_channel(1, get_voice_object)
                 server_queue = Playlist.queue_dict.get(self.user_server_id)
