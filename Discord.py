@@ -247,7 +247,7 @@ class YoutubePlayer(GetInfo):
           
             if is_int:
                 #The user did all the work for me. Just remove the index provided...
-                if Playlist.queue_dict.get(self.user_server_id):
+                if Playlist.queue_dict.get(self.user_server_id) and await self.democracy(self.message, True):
                     number_of_songs = len(Playlist.queue_dict.get(self.user_server_id))
                     if number_of_songs <= index and number_of_songs > 0:
                         removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
@@ -260,20 +260,21 @@ class YoutubePlayer(GetInfo):
 
             elif not is_int:
                 #This is my time to shine. Time for some detective action
-                search_url = await YoutubeSearch(user_input, self.message).search_youtube_url()
-                counter = 0
-                if Playlist.queue_dict.get(self.user_server_id):
-                    for tracks in Playlist.queue_dict[self.user_server_id]:
-                        search_in_queue = Playlist.queue_dict[self.user_server_id][counter]
-                        if search_url == search_in_queue:
-                            removed_index = Playlist.queue_dict[self.user_server_id].pop(counter)
-                            Playlist.owner_dict[self.user_server_id].pop(counter)
-                            return removed_index
+                if await self.democracy(self.message, True):
+                    search_url = await YoutubeSearch(user_input, self.message).search_youtube_url()
+                    counter = 0
+                    if Playlist.queue_dict.get(self.user_server_id):
+                        for tracks in Playlist.queue_dict[self.user_server_id]:
+                            search_in_queue = Playlist.queue_dict[self.user_server_id][counter]
+                            if search_url == search_in_queue:
+                                removed_index = Playlist.queue_dict[self.user_server_id].pop(counter)
+                                Playlist.owner_dict[self.user_server_id].pop(counter)
+                                return removed_index
+                            else:
+                                counter += 1
                         else:
-                            counter += 1
-                    else:
-                       await client.send_message(self.message.channel, 'Nu am gasti nici o melodie in queue cu keyword-ul mentionat de tine. Verifica daca melodia chiar exista in playlsit, sau incearca din nou.') 
-                       return False
+                           await client.send_message(self.message.channel, 'Nu am gasti nici o melodie in queue cu keyword-ul mentionat de tine. Verifica daca melodia chiar exista in playlsit, sau incearca din nou.') 
+                           return False
 
         
     async def pause_song(self):
