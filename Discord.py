@@ -36,6 +36,8 @@ import urllib.parse
 import re
 from discord.ext import commands
 import collections
+from bs4 import BeautifulSoup
+import requests
 
 version = 0.9
 
@@ -249,19 +251,24 @@ class YoutubePlayer(GetInfo):
                 #The user did all the work for me. Just remove the index provided...
                 if Playlist.queue_dict.get(self.user_server_id) and await self.democracy(self.message, True):
                     number_of_songs = len(Playlist.queue_dict.get(self.user_server_id))
-                    if number_of_songs <= index and number_of_songs > 0:
-                        removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
-                        Playlist.owner_dict[self.user_server_id].pop(index - 1)
-                        return removed_index
+                    if Playlist.queue_dict.get(self.user_server_id):
+                        if number_of_songs >= index -1 and number_of_songs > 0:
+                            try:
+                                removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
+                                Playlist.owner_dict[self.user_server_id].pop(index - 1)
+                                return removed_index
+                            except IndexError:
+                                await client.send_message(self.message.channel, 'Imi pare rau, nu exista atat de multe melodii in playlist.')
+                                return
 
-                    else:
-                        await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist cu index-ul mentionat de tine')
-                        return False
+                        else:
+                            await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist cu index-ul mentionat de tine')
+                            return False
 
             elif not is_int:
                 #This is my time to shine. Time for some detective action
                 if await self.democracy(self.message, True):
-                    search_url = await YoutubeSearch(user_input, self.message).search_youtube_url()
+                    search_url = await YoutubeSearch(user_input, self.message).search_youtube_url(self.user_server_id, 1)
                     counter = 0
                     if Playlist.queue_dict.get(self.user_server_id):
                         for tracks in Playlist.queue_dict[self.user_server_id]:
@@ -359,19 +366,66 @@ class YoutubeSearch:
     def __init__(self, user_keyword, message):
         self.user_keyword = user_keyword
         self.message = message
+        
     
 #Method for searching a YouTube url based on keywords
-    async def search_youtube_url(self):
-        try:
+    async def search_youtube_url(self, user_server_id, results_number):
+        
             # Modified code form Grant Curell, https://www.codeproject.com/Articles/873060/Python-Search-Youtube-for-Video. License: GPLv3.
             query_string = urllib.parse.urlencode({"search_query" : self.user_keyword})
             html_content = urllib.request.urlopen("https://www.youtube.com/results?" + query_string)
             search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
-            return ("https://www.youtube.com/watch?v=" + search_results[0])
-        # End of copyright
-        except:
-            await client.send_message(self.message.channel, 'Nu am gasit nici un rezultat cu numele "{}"'.format(self.user_keyword))
-            return
+            if results_number == 1:
+                return ("https://www.youtube.com/watch?v=" + search_results[0])
+                # End of copyright
+            else:
+                search_dict = {}
+                counter = 0
+                result = search_dict[user_server_id] = []
+                for links in search_results[0:results_number]:
+                    result.append('https://www.youtube.com/watch?v=' + search_results[counter])
+                    counter += 1
+                    if len(result) == results_number:
+                        print(result)
+                        return result
+
+    async def advanced_search(self, user_voice_ch_id, user_server_id):
+        await client.send_message(self.message.channel, 'Feature in BETA! Incep cautarea avansata...')
+        returned_youtube_url = await self.search_youtube_url(user_server_id, 5)
+        counter = 0
+        song_name_dict = {}
+        server_songs_name = song_name_dict[user_server_id] = []
+        if returned_youtube_url:
+            if len(returned_youtube_url) >= 5:
+                for links in returned_youtube_url:
+                    html_source = requests.get(returned_youtube_url[counter]).text
+                    Youtube_query = BeautifulSoup(html_source, 'lxml').title.text
+                    server_songs_name.append('{}. '.format(str(counter + 1)) + Youtube_query)
+                    counter += 1
+                    if len(server_songs_name) == 5:
+                        await client.send_message(self.message.channel, 'Am gasit: \n{} .\nAlege una dintre melodii prin a scrie ".alege" si numarul asociat melodiei. 60 de secunde la dispozitie...'.format('\n'.join(server_songs_name)))
+                        user_message = await client.wait_for_message(timeout=60, author = self.message.author)
+                        if user_message.content.startswith('.alege'):
+                            song_index = user_message.content.replace('.alege', '').strip()
+                            try:
+                                list_index = int(song_index)
+                                if list_index <= len(returned_youtube_url):
+                                    is_possible = True
+                                else:
+                                    await client.send_message(self.message.channel, 'Marimea conteaza, dar nu o supraestima. Index-ul este prea mare!')
+                            except:
+                                is_possible = False
+
+                            if is_possible:
+                                await YoutubePlayer(returned_youtube_url[list_index - 1], user_voice_ch_id, user_server_id, self.message).play_youtube_url()
+                            else:
+                                await client.send_message(self.message.server, 'Imi trebuie numarul melodiei, te roog.')
+            else:
+                await client.send_message(self.message.channel, 'Nu exista suficiente rezultate pentru o cautare avansata. Te rog sa formulezi alt keyword sau sa folosesti cautarea simpla.(".muzica + keyword")')
+        else:
+            await client.send_message(self.message.channel, 'Imi pare rau, nu s-a gasit nici un rezultat pe youtube cu un astfel de keyword.')
+
+        
 
 class Playlist(YoutubePlayer):
     queue_dict = {}
@@ -382,7 +436,6 @@ class Playlist(YoutubePlayer):
         if not cls.queue_dict.get(server):
             cls.queue_dict[server] = [song]
             cls.owner_dict[server] = [message.author]
-            print('d {}'.format(message.author))
         else:
             cls.queue_dict[server].append(song)
             cls.owner_dict[server].append(message.author)
@@ -472,7 +525,7 @@ async def on_message(message):
         test = await client.send_message(message.channel, "Da, functionez!")
         
     elif message.content.startswith('.debug'):
-        pass
+        await YoutubeSearch('maica-ta', message).search_youtube_url(info.user_server_id, 5)
 
     elif message.content.startswith('.vot'):
         
@@ -508,13 +561,16 @@ async def on_message(message):
 
         if output_url.startswith('-s'):
             final_user_keyword = output_url.replace('-s', '').strip()
+            await YoutubeSearch(final_user_keyword, info.message).advanced_search(info.user_voice_ch_id ,info.user_server_id)
 
-            await client.send_message(message.channel, 'Caut pe YouTube: "{}"'.format(final_user_keyword))
+        elif output_url.startswith('https://www.youtube.com/watch?v=') or output_url.startswith('http://www.youtube.com/watch?v=') or output_url.startswith('https://youtu.be/') or output_url.startswith('http://youtu.be/'):
+            await YoutubePlayer(output_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url() 
 
-            returned_youtube_url = await YoutubeSearch(final_user_keyword, message).search_youtube_url()
-            start_youtube_player = await YoutubePlayer(returned_youtube_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url()   
         else:
-            start_youtube_player = await YoutubePlayer(output_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url() 
+            await client.send_message(message.channel, 'Caut pe YouTube: "{}"'.format(output_url))
+            returned_youtube_url = await YoutubeSearch(output_url, message).search_youtube_url(info.user_server_id, 1)
+            await YoutubePlayer(returned_youtube_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url()
+             
 
     elif message.content.startswith('.versiune'):
         global version
@@ -625,4 +681,4 @@ async def on_message(message):
                
 # Run the bot. Put your own discord Token code in 'quotes'.
 
-client.run('YOUR_TOKEN_HERE')
+client.run('YOUR_TOKEN_HERE)
