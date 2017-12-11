@@ -67,6 +67,7 @@ client = commands.Bot(command_prefix=".")
 @client.event
 async def on_ready():
     print("RoBot in actiune...")
+    
 
 class GetInfo:
     def __init__(self, user_voice_ch_id, user_server_id, message):
@@ -237,7 +238,7 @@ class YoutubePlayer(GetInfo):
                     counter += 1
 
         elif not Playlist.queue_dict.get(self.user_server_id):
-            await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist')
+            await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist.')
             return False
 
         else:
@@ -252,14 +253,12 @@ class YoutubePlayer(GetInfo):
                 if Playlist.queue_dict.get(self.user_server_id) and await self.democracy(self.message, True):
                     number_of_songs = len(Playlist.queue_dict.get(self.user_server_id))
                     if Playlist.queue_dict.get(self.user_server_id):
-                        if number_of_songs >= index -1 and number_of_songs > 0:
-                            try:
-                                removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
-                                Playlist.owner_dict[self.user_server_id].pop(index - 1)
-                                return removed_index
-                            except IndexError:
-                                await client.send_message(self.message.channel, 'Imi pare rau, nu exista atat de multe melodii in playlist.')
-                                return
+                        if number_of_songs >= index and index > 0 and number_of_songs > 0:
+                            removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
+                            Playlist.owner_dict[self.user_server_id].pop(index - 1)
+                            return removed_index
+                            await client.send_message(self.message.channel, 'Imi pare rau, nu exista atat de multe melodii in playlist.')
+                            return
 
                         else:
                             await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist cu index-ul mentionat de tine')
@@ -389,6 +388,7 @@ class YoutubeSearch:
                         print(result)
                         return result
 
+    # Method for searhing multiple songs based on user input. The user is required to enter the song that should be played.
     async def advanced_search(self, user_voice_ch_id, user_server_id):
         await client.send_message(self.message.channel, 'Feature in BETA! Incep cautarea avansata...')
         returned_youtube_url = await self.search_youtube_url(user_server_id, 5)
@@ -400,7 +400,7 @@ class YoutubeSearch:
                 for links in returned_youtube_url:
                     html_source = requests.get(returned_youtube_url[counter]).text
                     Youtube_query = BeautifulSoup(html_source, 'lxml').title.text
-                    server_songs_name.append('{}. '.format(str(counter + 1)) + Youtube_query)
+                    server_songs_name.append('{}. {}'.format(str(counter + 1), Youtube_query))
                     counter += 1
                     if len(server_songs_name) == 5:
                         await client.send_message(self.message.channel, 'Am gasit: \n{} .\nAlege una dintre melodii prin a scrie ".alege" si numarul asociat melodiei. 60 de secunde la dispozitie...'.format('\n'.join(server_songs_name)))
@@ -681,4 +681,4 @@ async def on_message(message):
                
 # Run the bot. Put your own discord Token code in 'quotes'.
 
-client.run('YOUR_TOKEN_HERE)
+client.run('YOUR_TOKEN_HERE')
