@@ -257,8 +257,6 @@ class YoutubePlayer(GetInfo):
                             removed_index = Playlist.queue_dict[self.user_server_id].pop(index - 1)
                             Playlist.owner_dict[self.user_server_id].pop(index - 1)
                             return removed_index
-                            await client.send_message(self.message.channel, 'Imi pare rau, nu exista atat de multe melodii in playlist.')
-                            return
 
                         else:
                             await client.send_message(self.message.channel, 'Nu exista nici o melodie in playlist cu index-ul mentionat de tine')
