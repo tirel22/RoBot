@@ -373,7 +373,11 @@ class YoutubeSearch:
             html_content = urllib.request.urlopen("https://www.youtube.com/results?" + query_string)
             search_results = re.findall(r'href=\"\/watch\?v=(.{11})', html_content.read().decode())
             if results_number == 1:
-                return ("https://www.youtube.com/watch?v=" + search_results[0])
+                if search_results:
+                    return ("https://www.youtube.com/watch?v=" + search_results[0])
+                else:
+                    await client.send_message(self.message.channel, 'Imi pare rau, dar nu am gasit nici un rezultat cu acest keyword.')
+                    return
                 # End of copyright
             else:
                 search_dict = {}
