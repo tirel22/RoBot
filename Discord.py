@@ -111,8 +111,19 @@ class YoutubePlayer(GetInfo):
                 await client.send_message(self.message.channel, 'URL-ul YouTube este invalid. Ori exista o problema cu drepturile de autor, ori link-ul este gresit.')
                 await exit_voice_channel(1, voice)
             return False
+        if player.duration:
+            song_time = player.duration
+        else:
+            """This is a dirty hack to play YouTube live streams without crashing
+            I forgot that live streams existed. Who is watching YouTube live streams anyway...
+            So when I feel like tweaking this, I will. Trust me.
+            PS: 3600s = 1h, so in the range of 1-4 hours of stream the bot will 
+            get bored and exit the voice channel. 10/10 IGN. 
+            """
+            song_time = random_int_gen(3600, 12800)
+            print('Numar generat random pentru live stream: {}'.format(song_time))
 
-        song_time = int(player.duration)
+
         YoutubePlayer.player_dict[self.user_server_id] = player
         print('player: {}'.format(YoutubePlayer.player_dict[self.user_server_id]))
         return song_time
@@ -520,8 +531,9 @@ async def on_message(message):
 
     try:
         info = GetInfo(message.author.voice_channel.id, message.author.server.id, message)
+        could_get_user_info = True
     except AttributeError:
-        pass
+        could_get_user_info = False
 
     if message.content.startswith('.test'):
         test = await client.send_message(message.channel, "Da, functionez!")
@@ -559,9 +571,14 @@ async def on_message(message):
             await client.send_message(message.channel, 'Sunt un simplu bot, nu pot sa intru in voice channel inca o data.')
 
     elif message.content.startswith('.muzica'):
+        if not could_get_user_info:
+            await client.send_message(message.channel, 'Nu sunt suficient de inteligent pentru a-mi da seama in ce voice channel ar trebui sa intru daca nu esti conectat la unul. Te rog conecteaza-te si invoca-ma din nou, sunt pregatit sa petrecem.')
+            return False
+            
         output_url = info.message_content.replace('.muzica', '').strip()
-
-        if output_url.startswith('-s'):
+        if output_url == '':
+            await client.send_message(message.channel, 'Te rog indica-mi ce melodie trebuie sa pun, ori introducand cuvintele cheie pentru o cautare pe YouTube, ori printr-un link.')
+        elif output_url.startswith('-s'):
             final_user_keyword = output_url.replace('-s', '').strip()
             await YoutubeSearch(final_user_keyword, info.message).advanced_search(info.user_voice_ch_id ,info.user_server_id)
 
