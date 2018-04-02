@@ -25,7 +25,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 DEALINGS IN THE SOFTWARE.
 
 """
-
+import sys
 import random
 import math
 import os
@@ -39,7 +39,7 @@ import collections
 from bs4 import BeautifulSoup
 import requests
 
-version = 0.9
+version = 1.0
 
 if not discord.opus.is_loaded():
     try:
@@ -66,7 +66,19 @@ client = commands.Bot(command_prefix=".")
 
 @client.event
 async def on_ready():
-    print("RoBot in actiune...")
+    if len(sys.argv) > 1:
+        """
+        This is the implementation for emergency messages that will be send to all Discord servers that have this bot.
+        In an ideal world all Linux servers will have 100% uptime, but back to reality(there goes gravity), we have to be able to
+        send some kind of feedback when we are about to perform updates / close the server.
+        """    
+        for server in client.servers:
+            for text_channel in server.channels:
+                if text_channel.permissions_for(server.me).send_messages:
+                    await client.send_message(text_channel, str(sys.argv[1]))
+                    break
+    else:
+        print('Discord Python API v. {}\nRoBot in actiune. \nTotal servere Discord care folosesc bot-ul: {}'.format(discord.__version__, len(client.servers)))
     
 
 class GetInfo:
@@ -84,6 +96,7 @@ class YoutubePlayer(GetInfo):
     paused_state = {}
     user_votes = {}
     non_queue_owner = {}
+    vote_pending = {}
     def __init__(self, youtube_url, user_voice_ch_id, user_server_id, message):
         self.youtube_url = youtube_url
         super().__init__(user_voice_ch_id, user_server_id, message)
@@ -173,10 +186,6 @@ class YoutubePlayer(GetInfo):
                     if self.player_dict.get(self.user_server_id) == current_player:
                         self.destroy_youtube_player()
 
-            else:
-                await client.send_message(self.message.channel, 'URL-ul nu este valid. Pentru a cauta, foloseste comanda cu argumentul "-s" (.muzica -s)')
-                return 
-
               #If a song is in queue, play it.
             
     async def play_queued_song(self, skip_url):
@@ -213,7 +222,7 @@ class YoutubePlayer(GetInfo):
                         pass
                     break
                 song_time = int(player.duration)
-                pass_player_object = YoutubePlayer.player_dict[self.user_server_id] = player
+                YoutubePlayer.player_dict[self.user_server_id] = player
                 await exit_voice_channel(song_time, voice)
                 if was_skipped:
                     skip_url = None
@@ -306,16 +315,29 @@ class YoutubePlayer(GetInfo):
             await client.send_message(self.message.channel, 'Sunt pe stop, daca vrei sa fiu pe pauza trebuie sa pui o melodie.')
             return
 
-    # Simple vote method for voice related administrative tasks.
     async def democracy(self, message, scan_once):
-        # Remove junk if needed
-        if self.user_votes.get(self.user_server_id):
+        """
+        Simple vote method for voice related administrative tasks.
+        """
+
+        """
+        Check to see if the one trying to execute a administrative voice command has the right to do so before checking if another vote is pending. 
+        This is useful if a vote already started and than the owner showed to authorise the request, so he/she has unlimited power of that request.
+        It is very important to check if another vote is pending for security reasons. Otherwise trolls can just start another vote for the same
+        or different action before the previous votes expired, so all the previous votes are gone. We hate trolls, right?!?
+        """
+        if self.non_queue_owner.get(self.user_server_id) != self.message.author:
+            if self.vote_pending.get(self.user_server_id):
+                await client.send_message(self.message.channel, 'Exista momentan o alta actiune care necesita votare, actiune propusa de: {} Te rog sa astepti pana cand majoritatea voteaza actiunea anterioara sau pana cand aceasta expira'.format(self.vote_pending[self.user_server_id]))
+                return False
+            
+        if self.user_votes.get(self.user_server_id): # Remove junk if needed
             self.user_votes.pop(self.user_server_id)
-        voice_members = len(self.channel.voice_members)
+        voice_members = len(self.channel.voice_members) - 1 # We subtract 1 because the original lenght includes the bot in the counting. 
+                                                            #The bot should not be counted, only humans have poweeeer!!!! 
         if voice_members:
             if voice_members <= 2: 
-                """The bot is already connected to the voice channel,
-                so there sould be just one more member left. In this case,
+                """There sould be just two more member left. In this case,
                 there is no need for wasting processing power."""
                 return True
 
@@ -345,9 +367,8 @@ class YoutubePlayer(GetInfo):
                         return True
                     else:
                         await self.democracy(message, True)
-                        
-
                 
+            self.vote_pending[self.user_server_id] = self.message.author
             votes_req = voice_members // 2 # ~ 33% of the members, because it's floor division.
             await client.send_message(self.message.channel, 'Voturi necesare: {} , ".vot" pentru a vota. 60 de secunde ramase...'.format(votes_req))
             state = self.user_votes.get(self.user_server_id)
@@ -355,6 +376,8 @@ class YoutubePlayer(GetInfo):
             while x < 30: # ~ 60 sec vote time.
                 if self.user_votes.get(self.user_server_id):
                     if len(self.user_votes[self.user_server_id]) == votes_req:
+                        if self.vote_pending.get(self.user_server_id):
+                            self.vote_pending.pop(self.user_server_id)
                         return True
                     else:
                         if state != self.user_votes.get(self.user_server_id): # If a user has voted send feedback to the text channel.
@@ -363,6 +386,8 @@ class YoutubePlayer(GetInfo):
                 x +=1
                 await asyncio.sleep(2)
             else:
+                if self.vote_pending.get(self.user_server_id):
+                    self.vote_pending.pop(self.user_server_id) # The time has expired
                 await client.send_message(self.message.channel, 'Tic-tac, n-ati votat.')
                 if self.user_votes.get(self.user_server_id):
                     self.user_votes.pop(self.user_server_id)
@@ -402,20 +427,20 @@ class YoutubeSearch:
                         return result
 
     # Method for searhing multiple songs based on user input. The user is required to enter the song that should be played.
-    async def advanced_search(self, user_voice_ch_id, user_server_id):
+    async def advanced_search(self, user_voice_ch_id, user_server_id, results_number):
         await client.send_message(self.message.channel, 'Feature in BETA! Incep cautarea avansata...')
-        returned_youtube_url = await self.search_youtube_url(user_server_id, 5)
+        returned_youtube_url = await self.search_youtube_url(user_server_id, results_number)
         counter = 0
         song_name_dict = {}
         server_songs_name = song_name_dict[user_server_id] = []
         if returned_youtube_url:
-            if len(returned_youtube_url) >= 5:
+            if len(returned_youtube_url) >= results_number:
                 for links in returned_youtube_url:
                     html_source = requests.get(returned_youtube_url[counter]).text
                     Youtube_query = BeautifulSoup(html_source, 'lxml').title.text
                     server_songs_name.append('{}. {}'.format(str(counter + 1), Youtube_query))
                     counter += 1
-                    if len(server_songs_name) == 5:
+                    if len(server_songs_name) == results_number:
                         await client.send_message(self.message.channel, 'Am gasit: \n{} .\nAlege una dintre melodii prin a scrie ".alege" si numarul asociat melodiei. 60 de secunde la dispozitie...'.format('\n'.join(server_songs_name)))
                         user_message = await client.wait_for_message(timeout=60, author = self.message.author)
                         if user_message.content.startswith('.alege'):
@@ -465,11 +490,11 @@ class ForceExit(YoutubePlayer):
             if await self.democracy(self.message, False):
                 get_voice_object = YoutubePlayer.voice_dict[self.user_server_id]
                 await exit_voice_channel(1, get_voice_object)
-                server_queue = Playlist.queue_dict.get(self.user_server_id)
                 if clear_queue:
-                    if server_queue:
-                        Playlist.queue_dict.pop(self.user_server_id)
-                        Playlist.owner_dict.pop(self.user_server_id)
+                    if Playlist.queue_dict.get(self.user_server_id):
+                        if len(Playlist.queue_dict[self.user_server_id]) > 0:
+                            Playlist.queue_dict.pop(self.user_server_id)
+                            Playlist.owner_dict.pop(self.user_server_id)
                     self.destroy_youtube_player()
         else:
             await client.send_message(self.message.channel, 'Nu sunt conectat la un voice channel. ')
@@ -580,7 +605,7 @@ async def on_message(message):
             await client.send_message(message.channel, 'Te rog indica-mi ce melodie trebuie sa pun, ori introducand cuvintele cheie pentru o cautare pe YouTube, ori printr-un link.')
         elif output_url.startswith('-s'):
             final_user_keyword = output_url.replace('-s', '').strip()
-            await YoutubeSearch(final_user_keyword, info.message).advanced_search(info.user_voice_ch_id ,info.user_server_id)
+            await YoutubeSearch(final_user_keyword, info.message).advanced_search(info.user_voice_ch_id ,info.user_server_id, 5)
 
         elif output_url.startswith('https://www.youtube.com/watch?v=') or output_url.startswith('http://www.youtube.com/watch?v=') or output_url.startswith('https://youtu.be/') or output_url.startswith('http://youtu.be/'):
             await YoutubePlayer(output_url, info.user_voice_ch_id, info.user_server_id, message).play_youtube_url() 
